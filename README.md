@@ -114,7 +114,7 @@ Note: The application is **NOT** invisible to:
 1. Clone the repository:
 
 ```bash
-git clone https://github.com/greeneu/interview-coder-withoupaywall-opensource.git
+git clone https://github.com/a1594834522-coder/interview-coder.git
 cd interview-coder-withoupaywall-opensource
 ```
 
