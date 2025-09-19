@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import {
   Dialog,
-  DialogTrigger,
   DialogContent,
   DialogDescription,
   DialogHeader,
@@ -10,7 +9,6 @@ import {
 } from "../ui/dialog";
 import { Input } from "../ui/input";
 import { Button } from "../ui/button";
-import { Settings } from "lucide-react";
 import { useToast } from "../../contexts/toast";
 
 type APIProvider = "openai" | "gemini" | "anthropic";
@@ -50,14 +48,14 @@ const modelCategories: ModelCategory[] = [
     ],
     geminiModels: [
       {
-        id: "gemini-1.5-pro",
-        name: "Gemini 1.5 Pro",
-        description: "Best overall performance for problem extraction"
+        id: "gemini-2.5-pro",
+        name: "Gemini 2.5 Pro",
+        description: "Highest accuracy for multimodal problem extraction"
       },
       {
-        id: "gemini-2.0-flash",
-        name: "Gemini 2.0 Flash",
-        description: "Faster, more cost-effective option"
+        id: "gemini-2.5-flash",
+        name: "Gemini 2.5 Flash",
+        description: "Fast option with UseContext7 extended context"
       }
     ],
     anthropicModels: [
@@ -81,7 +79,7 @@ const modelCategories: ModelCategory[] = [
   {
     key: 'solutionModel',
     title: 'Solution Generation',
-    description: 'Model used to generate coding solutions',
+    description: 'Model used to generate solutions, analyses, and walkthroughs',
     openaiModels: [
       {
         id: "gpt-4o",
@@ -96,14 +94,14 @@ const modelCategories: ModelCategory[] = [
     ],
     geminiModels: [
       {
-        id: "gemini-1.5-pro",
-        name: "Gemini 1.5 Pro",
-        description: "Strong overall performance for coding tasks"
+        id: "gemini-2.5-pro",
+        name: "Gemini 2.5 Pro",
+        description: "Best for mixed coding, reasoning, and comprehension tasks"
       },
       {
-        id: "gemini-2.0-flash",
-        name: "Gemini 2.0 Flash",
-        description: "Faster, more cost-effective option"
+        id: "gemini-2.5-flash",
+        name: "Gemini 2.5 Flash",
+        description: "Rapid responses for walkthroughs and iterative drafting"
       }
     ],
     anthropicModels: [
@@ -142,14 +140,14 @@ const modelCategories: ModelCategory[] = [
     ],
     geminiModels: [
       {
-        id: "gemini-1.5-pro",
-        name: "Gemini 1.5 Pro",
-        description: "Best for analyzing code and error messages"
+        id: "gemini-2.5-pro",
+        name: "Gemini 2.5 Pro",
+        description: "Deep debugging context with UseContext7 awareness"
       },
       {
-        id: "gemini-2.0-flash",
-        name: "Gemini 2.0 Flash",
-        description: "Faster, more cost-effective option"
+        id: "gemini-2.5-flash",
+        name: "Gemini 2.5 Flash",
+        description: "Fast diffing and remediation suggestions"
       }
     ],
     anthropicModels: [
@@ -172,6 +170,24 @@ const modelCategories: ModelCategory[] = [
   }
 ];
 
+const providerDefaults: Record<APIProvider, { extraction: string; solution: string; debugging: string }> = {
+  openai: {
+    extraction: "gpt-4o",
+    solution: "gpt-4o",
+    debugging: "gpt-4o"
+  },
+  gemini: {
+    extraction: "gemini-2.5-flash",
+    solution: "gemini-2.5-pro",
+    debugging: "gemini-2.5-flash"
+  },
+  anthropic: {
+    extraction: "claude-3-7-sonnet-20250219",
+    solution: "claude-3-7-sonnet-20250219",
+    debugging: "claude-3-7-sonnet-20250219"
+  }
+};
+
 interface SettingsDialogProps {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -181,11 +197,16 @@ export function SettingsDialog({ open: externalOpen, onOpenChange }: SettingsDia
   const [open, setOpen] = useState(externalOpen || false);
   const [apiKey, setApiKey] = useState("");
   const [apiProvider, setApiProvider] = useState<APIProvider>("openai");
-  const [extractionModel, setExtractionModel] = useState("gpt-4o");
-  const [solutionModel, setSolutionModel] = useState("gpt-4o");
-  const [debuggingModel, setDebuggingModel] = useState("gpt-4o");
+  const [extractionModel, setExtractionModel] = useState(providerDefaults.openai.extraction);
+  const [solutionModel, setSolutionModel] = useState(providerDefaults.openai.solution);
+  const [debuggingModel, setDebuggingModel] = useState(providerDefaults.openai.debugging);
   const [isLoading, setIsLoading] = useState(false);
   const { showToast } = useToast();
+  const providerDisplayName: Record<APIProvider, string> = {
+    openai: "OpenAI",
+    gemini: "Google",
+    anthropic: "Anthropic"
+  };
 
   // Sync with external open state
   useEffect(() => {
@@ -218,11 +239,14 @@ export function SettingsDialog({ open: externalOpen, onOpenChange }: SettingsDia
       window.electronAPI
         .getConfig()
         .then((config: Config) => {
+          const resolvedProvider = config.apiProvider || "openai";
+          const defaults = providerDefaults[resolvedProvider];
+
           setApiKey(config.apiKey || "");
-          setApiProvider(config.apiProvider || "openai");
-          setExtractionModel(config.extractionModel || "gpt-4o");
-          setSolutionModel(config.solutionModel || "gpt-4o");
-          setDebuggingModel(config.debuggingModel || "gpt-4o");
+          setApiProvider(resolvedProvider);
+          setExtractionModel(config.extractionModel || defaults.extraction);
+          setSolutionModel(config.solutionModel || defaults.solution);
+          setDebuggingModel(config.debuggingModel || defaults.debugging);
         })
         .catch((error: unknown) => {
           console.error("Failed to load config:", error);
@@ -239,19 +263,11 @@ export function SettingsDialog({ open: externalOpen, onOpenChange }: SettingsDia
     setApiProvider(provider);
     
     // Reset models to defaults when changing provider
-    if (provider === "openai") {
-      setExtractionModel("gpt-4o");
-      setSolutionModel("gpt-4o");
-      setDebuggingModel("gpt-4o");
-    } else if (provider === "gemini") {
-      setExtractionModel("gemini-1.5-pro");
-      setSolutionModel("gemini-1.5-pro");
-      setDebuggingModel("gemini-1.5-pro");
-    } else if (provider === "anthropic") {
-      setExtractionModel("claude-3-7-sonnet-20250219");
-      setSolutionModel("claude-3-7-sonnet-20250219");
-      setDebuggingModel("claude-3-7-sonnet-20250219");
-    }
+    const defaults = providerDefaults[provider];
+
+    setExtractionModel(defaults.extraction);
+    setSolutionModel(defaults.solution);
+    setDebuggingModel(defaults.debugging);
   };
 
   const handleSave = async () => {
@@ -388,7 +404,7 @@ export function SettingsDialog({ open: externalOpen, onOpenChange }: SettingsDia
               </div>
             </div>
           </div>
-          
+
           <div className="space-y-2">
             <label className="text-sm font-medium text-white" htmlFor="apiKey">
             {apiProvider === "openai" ? "OpenAI API Key" : 
@@ -413,7 +429,7 @@ export function SettingsDialog({ open: externalOpen, onOpenChange }: SettingsDia
               </p>
             )}
             <p className="text-xs text-white/50">
-              Your API key is stored locally and never sent to any server except {apiProvider === "openai" ? "OpenAI" : "Google"}
+              Your API key is stored locally and never sent to any server except {providerDisplayName[apiProvider]}
             </p>
             <div className="mt-2 p-2 rounded-md bg-white/5 border border-white/10">
               <p className="text-xs text-white/80 mb-1">Don't have an API key?</p>

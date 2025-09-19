@@ -16,7 +16,7 @@
 
 > ## 🔑 API KEY INFORMATION - UPDATED
 >
-> We have tested and confirmed that **both Gemini and OpenAI APIs work properly** with the current version. If you are experiencing issues with your API keys:
+> We have tested and confirmed that **Gemini and OpenAI APIs work properly** with the current version. If you are experiencing issues with your API keys:
 >
 > - Try deleting your API key entry from the config file located in your user data directory
 > - Log out and log back in to the application
@@ -27,7 +27,7 @@
 
 ## Free, Open-Source AI-Powered Interview Preparation Tool
 
-This project provides a powerful alternative to premium coding interview platforms. It delivers the core functionality of paid interview preparation tools but in a free, open-source package. Using your own OpenAI API key, you get access to advanced features like AI-powered problem analysis, solution generation, and debugging assistance - all running locally on your machine.
+This project provides a powerful alternative to premium coding interview platforms. It delivers the core functionality of paid interview preparation tools but in a free, open-source package. Using your own OpenAI, Gemini, or Anthropic API key, you get access to advanced features like AI-powered problem analysis, solution generation, and debugging assistance - all running locally on your machine.
 
 ### Why This Exists
 
@@ -42,7 +42,7 @@ The best coding interview tools are often behind expensive paywalls, making them
 
 The codebase is designed to be adaptable:
 
-- **AI Models**: Though currently using OpenAI's models, you can modify the code to integrate with other providers like Claude, Deepseek, Llama, or any model with an API. All integration code is in `electron/ProcessingHelper.ts` and UI settings are in `src/components/Settings/SettingsDialog.tsx`.
+- **AI Models**: The app ships with OpenAI GPT-4o, Gemini 2.5, and Anthropic Claude 3 support out of the box. You can still modify the code to integrate additional providers such as Llama or any API-compatible model. All integration code is in `electron/ProcessingHelper.ts` and UI settings are in `src/components/Settings/SettingsDialog.tsx`.
 - **Languages**: Add support for additional programming languages
 - **Features**: Extend the functionality with new capabilities 
 - **UI**: Customize the interface to your preferences
@@ -53,12 +53,12 @@ All it takes is modest JavaScript/TypeScript knowledge and understanding of the 
 
 - 🎯 99% Invisibility: Undetectable window that bypasses most screen capture methods
 - 📸 Smart Screenshot Capture: Capture both question text and code separately for better analysis
-- 🤖 AI-Powered Analysis: Automatically extracts and analyzes coding problems using GPT-4o
+- 🤖 AI-Powered Analysis: Automatically extracts and analyzes coding problems using GPT-4o, Gemini 2.5, or Claude 3
 - 💡 Solution Generation: Get detailed explanations and solutions with time/space complexity analysis
 - 🔧 Real-time Debugging: Debug your code with AI assistance and structured feedback
 - 🎨 Advanced Window Management: Freely move, resize, change opacity, and zoom the window
-- 🔄 Model Selection: Choose between GPT-4o and GPT-4o-mini for different processing stages
-- 🔒 Privacy-Focused: Your API key and data never leave your computer except for OpenAI API calls
+- 🔄 Model Selection: Choose between provider-specific models (GPT-4o / GPT-4o-mini, Gemini 2.5 Flash / Pro, Claude 3 Sonnet) for each processing stage
+- 🔒 Privacy-Focused: Your API key and data never leave your computer except for direct calls to the provider you configure
 
 ## Global Commands
 

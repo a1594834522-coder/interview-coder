@@ -261,29 +261,27 @@ const Debug: React.FC<DebugProps> = ({
   return (
     <div ref={contentRef} className="relative">
       <div className="space-y-3 px-4 py-3">
-      {/* Conditionally render the screenshot queue */}
+      {/* Screenshot queue + command bar */}
       <div className="bg-transparent w-fit">
-        <div className="pb-3">
-          <div className="space-y-3 w-fit">
-            <ScreenshotQueue
-              screenshots={screenshots}
-              onDeleteScreenshot={handleDeleteExtraScreenshot}
-              isLoading={isProcessing}
-            />
-          </div>
+        <div className="space-y-3 w-fit">
+          <ScreenshotQueue
+            screenshots={screenshots}
+            onDeleteScreenshot={handleDeleteExtraScreenshot}
+            isLoading={isProcessing}
+          />
+
+          <SolutionCommands
+            screenshots={screenshots}
+            onTooltipVisibilityChange={handleTooltipVisibilityChange}
+            isProcessing={isProcessing}
+            extraScreenshots={screenshots}
+            credits={window.__CREDITS__}
+            currentLanguage={currentLanguage}
+            setLanguage={setLanguage}
+            isCodingTask={true}
+          />
         </div>
       </div>
-
-      {/* Navbar of commands with the tooltip */}
-      <SolutionCommands
-        screenshots={screenshots}
-        onTooltipVisibilityChange={handleTooltipVisibilityChange}
-        isProcessing={isProcessing}
-        extraScreenshots={screenshots}
-        credits={window.__CREDITS__}
-        currentLanguage={currentLanguage}
-        setLanguage={setLanguage}
-      />
 
       {/* Main Content */}
       <div className="w-full text-sm text-black bg-black/60 rounded-md">

@@ -20,9 +20,9 @@ export class ConfigHelper extends EventEmitter {
   private defaultConfig: Config = {
     apiKey: "",
     apiProvider: "gemini", // Default to Gemini
-    extractionModel: "gemini-2.0-flash", // Default to Flash for faster responses
-    solutionModel: "gemini-2.0-flash",
-    debuggingModel: "gemini-2.0-flash",
+    extractionModel: "gemini-2.5-flash", // Default to Flash for faster responses
+    solutionModel: "gemini-2.5-pro",
+    debuggingModel: "gemini-2.5-flash",
     language: "python",
     opacity: 1.0
   };
@@ -68,11 +68,11 @@ export class ConfigHelper extends EventEmitter {
       }
       return model;
     } else if (provider === "gemini")  {
-      // Only allow gemini-1.5-pro and gemini-2.0-flash for Gemini
-      const allowedModels = ['gemini-1.5-pro', 'gemini-2.0-flash'];
+      // Only allow gemini-2.5-pro and gemini-2.5-flash for Gemini
+      const allowedModels = ['gemini-2.5-pro', 'gemini-2.5-flash'];
       if (!allowedModels.includes(model)) {
-        console.warn(`Invalid Gemini model specified: ${model}. Using default model: gemini-2.0-flash`);
-        return 'gemini-2.0-flash'; // Changed default to flash
+        console.warn(`Invalid Gemini model specified: ${model}. Using default model: gemini-2.5-flash`);
+        return 'gemini-2.5-flash'; // Changed default to flash
       }
       return model;
     }  else if (provider === "anthropic") {
@@ -153,12 +153,13 @@ export class ConfigHelper extends EventEmitter {
       // Auto-detect provider based on API key format if a new key is provided
       if (updates.apiKey && !updates.apiProvider) {
         // If API key starts with "sk-", it's likely an OpenAI key
-        if (updates.apiKey.trim().startsWith('sk-')) {
-          provider = "openai";
-          console.log("Auto-detected OpenAI API key format");
-        } else if (updates.apiKey.trim().startsWith('sk-ant-')) {
+        const trimmedKey = updates.apiKey.trim();
+        if (trimmedKey.startsWith('sk-ant-')) {
           provider = "anthropic";
           console.log("Auto-detected Anthropic API key format");
+        } else if (trimmedKey.startsWith('sk-')) {
+          provider = "openai";
+          console.log("Auto-detected OpenAI API key format");
         } else {
           provider = "gemini";
           console.log("Using Gemini API key format (default)");
@@ -179,9 +180,9 @@ export class ConfigHelper extends EventEmitter {
           updates.solutionModel = "claude-3-7-sonnet-20250219";
           updates.debuggingModel = "claude-3-7-sonnet-20250219";
         } else {
-          updates.extractionModel = "gemini-2.0-flash";
-          updates.solutionModel = "gemini-2.0-flash";
-          updates.debuggingModel = "gemini-2.0-flash";
+          updates.extractionModel = "gemini-2.5-flash";
+          updates.solutionModel = "gemini-2.5-pro";
+          updates.debuggingModel = "gemini-2.5-flash";
         }
       }
       
@@ -249,7 +250,7 @@ export class ConfigHelper extends EventEmitter {
       // Basic format validation for Anthropic API keys
       return /^sk-ant-[a-zA-Z0-9]{32,}$/.test(apiKey.trim());
     }
-    
+
     return false;
   }
   
@@ -304,7 +305,7 @@ export class ConfigHelper extends EventEmitter {
         console.log("Using Gemini API key format for testing (default)");
       }
     }
-    
+
     if (provider === "openai") {
       return this.testOpenAIKey(apiKey);
     } else if (provider === "gemini") {
@@ -312,7 +313,7 @@ export class ConfigHelper extends EventEmitter {
     } else if (provider === "anthropic") {
       return this.testAnthropicKey(apiKey);
     }
-    
+
     return { valid: false, error: "Unknown API provider" };
   }
   
@@ -394,6 +395,7 @@ export class ConfigHelper extends EventEmitter {
       return { valid: false, error: errorMessage };
     }
   }
+
 }
 
 // Export a singleton instance

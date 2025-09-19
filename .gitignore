@@ -1,12 +1,51 @@
-node_modules
-dist-electron
-release
-dist
+# Dependencies
+node_modules/
+renderer/node_modules/
+
+# Build artifacts
+build/outputs/
+dist/
+dist-*/
+dist-electron/
+release/
+renderer/dist/
+renderer/.next/
+*.asar
+*.tar.gz
+*.tgz
+
+# Logs and temp files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.log
+*.tmp
+*.temp
+*.swp
+
+# Environment configuration
 .env
 .env.*
-**/.DS_Store
-**/.vscode
-**/.idea
+!.env.example
+
+# Tooling caches
+bun.lockb
+.vite/
+.renderer-cache/
+electron/.cache/
+coverage/
+
+# Project scripts (keep ignored)
 scripts/
 **/scripts/
 scripts/manual-notarize.js
+
+# IDE / OS metadata
+.vscode/
+.idea/
+**/.DS_Store
+Thumbs.db
+
+AGENTS.md
+CLAUDE.md
