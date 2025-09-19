@@ -1,313 +1,78 @@
-# CodeInterviewAssist
-
-> ## ⚠️ IMPORTANT NOTICE TO THE COMMUNITY ⚠️
-> 
-> **This is a free, open-source initiative - NOT a full-service product!**
-> 
-> There are numerous paid interview preparation tools charging hundreds of dollars for comprehensive features like live audio capture, automated answer generation, and more. This project is fundamentally different:
-> 
-> - This is a **small, non-profit, community-driven project** with zero financial incentive behind it
-> - The entire codebase is freely available for anyone to use, modify, or extend
-> - Want features like voice support? You're welcome to integrate tools like OpenAI's Whisper or other APIs
-> - New features should come through **community contributions** - it's unreasonable to expect a single maintainer to implement premium features for free
-> - The maintainer receives no portfolio benefit, monetary compensation, or recognition for this work
-> 
-> **Before submitting feature requests or expecting personalized support, please understand this project exists purely as a community resource.** If you value what's been created, the best way to show appreciation is by contributing code, documentation, or helping other users.
-
-> ## 🔑 API KEY INFORMATION - UPDATED
->
-> We have tested and confirmed that **Gemini and OpenAI APIs work properly** with the current version. If you are experiencing issues with your API keys:
->
-> - Try deleting your API key entry from the config file located in your user data directory
-> - Log out and log back in to the application
-> - Check your API key dashboard to verify the key is active and has sufficient credits
-> - Ensure you're using the correct API key format (OpenAI keys start with "sk-")
->
-> The configuration file is stored at: `C:\Users\[USERNAME]\AppData\Roaming\interview-coder-v1\config.json` (on Windows) or `/Users/[USERNAME]/Library/Application Support/interview-coder-v1/config.json` (on macOS)
-
-## Free, Open-Source AI-Powered Interview Preparation Tool
-
-This project provides a powerful alternative to premium coding interview platforms. It delivers the core functionality of paid interview preparation tools but in a free, open-source package. Using your own OpenAI, Gemini, or Anthropic API key, you get access to advanced features like AI-powered problem analysis, solution generation, and debugging assistance - all running locally on your machine.
-
-### Why This Exists
-
-The best coding interview tools are often behind expensive paywalls, making them inaccessible to many students and job seekers. This project provides the same powerful functionality without the cost barrier, letting you:
-
-- Use your own API key (pay only for what you use)
-- Run everything locally on your machine with complete privacy
-- Make customizations to suit your specific needs
-- Learn from and contribute to an open-source tool
-
-### Customization Possibilities
-
-The codebase is designed to be adaptable:
-
-- **AI Models**: The app ships with OpenAI GPT-4o, Gemini 2.5, and Anthropic Claude 3 support out of the box. You can still modify the code to integrate additional providers such as Llama or any API-compatible model. All integration code is in `electron/ProcessingHelper.ts` and UI settings are in `src/components/Settings/SettingsDialog.tsx`.
-- **Languages**: Add support for additional programming languages
-- **Features**: Extend the functionality with new capabilities 
-- **UI**: Customize the interface to your preferences
-
-All it takes is modest JavaScript/TypeScript knowledge and understanding of the API you want to integrate.
-
-## Features
+# Interview Coder（开源魔改版）
 
-- 🎯 99% Invisibility: Undetectable window that bypasses most screen capture methods
-- 📸 Smart Screenshot Capture: Capture both question text and code separately for better analysis
-- 🤖 AI-Powered Analysis: Automatically extracts and analyzes coding problems using GPT-4o, Gemini 2.5, or Claude 3
-- 💡 Solution Generation: Get detailed explanations and solutions with time/space complexity analysis
-- 🔧 Real-time Debugging: Debug your code with AI assistance and structured feedback
-- 🎨 Advanced Window Management: Freely move, resize, change opacity, and zoom the window
-- 🔄 Model Selection: Choose between provider-specific models (GPT-4o / GPT-4o-mini, Gemini 2.5 Flash / Pro, Claude 3 Sonnet) for each processing stage
-- 🔒 Privacy-Focused: Your API key and data never leave your computer except for direct calls to the provider you configure
-
-## Global Commands
-
-The application uses unidentifiable global keyboard shortcuts that won't be detected by browsers or other applications:
-
-- Toggle Window Visibility: [Control or Cmd + B]
-- Move Window: [Control or Cmd + Arrow keys]
-- Take Screenshot: [Control or Cmd + H]
-- Delete Last Screenshot: [Control or Cmd + L]
-- Process Screenshots: [Control or Cmd + Enter]
-- Start New Problem: [Control or Cmd + R]
-- Quit: [Control or Cmd + Q]
-- Decrease Opacity: [Control or Cmd + []
-- Increase Opacity: [Control or Cmd + ]]
-- Zoom Out: [Control or Cmd + -]
-- Reset Zoom: [Control or Cmd + 0]
-- Zoom In: [Control or Cmd + =]
-
-## Invisibility Compatibility
+这是一个面向技术面试的桌面助手，提供截图解析、AI 解题与调试、隐身窗口等功能。应用完全本地运行，需自备 OpenAI、Google Gemini 或 Anthropic 等模型的 API Key，私有数据仅在你与模型供应商之间传输。
 
-The application is invisible to:
+## 功能概览
+- 截图队列：使用全局快捷键随时捕获题面或代码，最多保留 5 张，队列内可删除与重新截图。
+- AI 解析与作答：自动读取截图，生成题目理解、思考过程与最终回答。若检测到代码需求会输出可复制代码块并附复杂度说明；识别到选择题会给出明确 ABCD 选项及理由。
+- 结果调试：Solutions 页面可一键进入 Debug 模式，将错误截图交给模型输出修复建议、关键问题和优化方向。
+- 窗口隐身：Electron 浮窗默认透明，支持位置、透明度、尺寸调节，降低被屏幕共享或录制捕捉的风险。
+- 多模型支持：内置 GPT‑4o、Gemini 2.5、Claude 3 等模型配置，可按需切换或扩展。
 
-- Zoom versions below 6.1.6 (inclusive)
-- All browser-based screen recording software
-- All versions of Discord
-- Mac OS _screenshot_ functionality (Command + Shift + 3/4)
+## 运行要求
+- Windows 10/11（推荐），macOS 13 及以上可使用同目录下的启动脚本
+- Node.js 18 或更新版本
+- 首次运行需执行 npm install 安装依赖
+- 可用的 API Key（在应用内的设置弹窗中粘贴）
 
-Note: The application is **NOT** invisible to:
+## 快速启动（Windows）
+1. 安装依赖：
 
-- Zoom versions 6.1.6 and above
-  - https://zoom.en.uptodown.com/mac/versions (link to downgrade Zoom if needed)
-- Mac OS native screen _recording_ (Command + Shift + 5)
+       npm install
 
-## Prerequisites
+2. 启动隐身版应用：
 
-- Node.js (v16 or higher)
-- npm or bun package manager
-- OpenAI API Key
-- Screen Recording Permission for Terminal/IDE
-  - On macOS:
-    1. Go to System Preferences > Security & Privacy > Privacy > Screen Recording
-    2. Ensure that CodeInterviewAssist has screen recording permission enabled
-    3. Restart CodeInterviewAssist after enabling permissions
-  - On Windows:
-    - No additional permissions needed
-  - On Linux:
-    - May require `xhost` access depending on your distribution
+       stealth-run.bat
 
-## Running the Application
+   脚本会自动清理旧构建、重新打包并以隐身模式启动应用。
+3. 启动后按 Ctrl + B 显示主窗口，在设置面板中填写 API Key 后即可使用。（推荐使用gemini2.5flash）
 
-### Quick Start
+### 常用快捷键
+| 功能 | 快捷键 |
+| --- | --- |
+| 显示或隐藏窗口 | Ctrl + B |
+| 捕获截图 | Ctrl + H |
+| 处理当前截图 | Ctrl + Enter |
+| 删除最新截图 | Ctrl + L |
+| 重置会话 | Ctrl + R |
+| 移动窗口 | Ctrl + 方向键 |
+| 调整透明度 | Ctrl + [（降低）/ Ctrl + ]（升高） |
+| 退出应用 | Ctrl + Q |
 
-1. Clone the repository:
+提示：若窗口不可见或无法拖动，请先按一次 Ctrl + B 使其可见，再配合方向键或透明度快捷键调整位置。
 
-```bash
-git clone https://github.com/a1594834522-coder/interview-coder.git
-cd interview-coder-withoupaywall-opensource
-```
+## 界面说明
+- Queue：展示当前截图列表，支持删除与重新截图；右侧浮窗列出常用指令与状态提示。
+- Solutions：展示模型输出的思路、答案或代码、复杂度以及关键要点，可继续截取新的上下文并再次求解。
+- Debug：针对已有答案的复查模式，上传报错截图让模型指出问题与修复建议。
 
-2. Install dependencies:
+## API Key 与配置
+- API Key 在设置面板中管理，可随时切换模型供应商。
+- 本地配置默认路径：
+  - Windows：%APPDATA%\interview-coder-v1\config.json
+  - macOS：~/Library/Application Support/interview-coder-v1/config.json
+- 删除该文件可重置登录与模型设定。
 
-```bash
-npm install
-```
-
-3. **RECOMMENDED**: Clean any previous builds:
+## 开发与构建
+- 开发调试：
 
-```bash
-npm run clean
-```
+       npm run dev
 
-4. Run the appropriate script for your platform:
-
-**For Windows:**
-```bash
-stealth-run.bat
-```
-
-**For macOS/Linux:**
-```bash
-# Make the script executable first
-chmod +x stealth-run.sh
-./stealth-run.sh
-```
-
-**IMPORTANT**: The application window will be invisible by default! Use Ctrl+B (or Cmd+B on Mac) to toggle visibility.
-
-### Building Distributable Packages
-
-To create installable packages for distribution:
-
-**For macOS (DMG):**
-```bash
-# Using npm
-npm run package-mac
-
-# Or using yarn
-yarn package-mac
-```
-
-**For Windows (Installer):**
-```bash
-# Using npm
-npm run package-win
-
-# Or using yarn
-yarn package-win
-```
+- 手动构建（通常由 stealth-run.bat 调用）：
 
-The packaged applications will be available in the `release` directory.
+       npm run build
 
-**What the scripts do:**
-- Create necessary directories for the application
-- Clean previous builds to ensure a fresh start
-- Build the application in production mode
-- Launch the application in invisible mode
-
-### Notes & Troubleshooting
-
-- **Window Manager Compatibility**: Some window management tools (like Rectangle Pro on macOS) may interfere with the app's window movement. Consider disabling them temporarily.
-
-- **API Usage**: Be mindful of your OpenAI API key's rate limits and credit usage. Vision API calls are more expensive than text-only calls.
+- 打包安装包：npm run package / npm run package-win / npm run package-mac
 
-- **LLM Customization**: You can easily customize the app to include LLMs like Claude, Deepseek, or Grok by modifying the API calls in `ProcessingHelper.ts` and related UI components.
+## 常见问题
+- 窗口不见了？应用仍在后台。按 Ctrl + B 切换可见性，或在任务管理器结束 electron 进程后重新运行脚本。
+- 快捷键失效？确认系统授予屏幕录制或全局快捷键权限。macOS 需在“系统设置 → 隐私与安全性 → 屏幕录制”中勾选终端或 IDE。
+- 模型调用失败？核对 API Key 是否正确、额度是否充足，可在设置面板切换其他模型测试。
 
-- **Common Issues**:
-  - Run `npm run clean` before starting the app for a fresh build
-  - Use Ctrl+B/Cmd+B multiple times if the window doesn't appear
-  - Adjust window opacity with Ctrl+[/]/Cmd+[/] if needed
-  - For macOS: ensure script has execute permissions (`chmod +x stealth-run.sh`)
-
-## Comparison with Paid Interview Tools
-
-| Feature | Premium Tools (Paid) | CodeInterviewAssist (This Project) |
-|---------|------------------------|----------------------------------------|
-| Price | $60/month subscription | Free (only pay for your API usage) |
-| Solution Generation | ✅ | ✅ |
-| Debugging Assistance | ✅ | ✅ |
-| Invisibility | ✅ | ✅ |
-| Multi-language Support | ✅ | ✅ |
-| Time/Space Complexity Analysis | ✅ | ✅ |
-| Window Management | ✅ | ✅ |
-| Auth System | Required | None (Simplified) |
-| Payment Processing | Required | None (Use your own API key) |
-| Privacy | Server-processed | 100% Local Processing |
-| Customization | Limited | Full Source Code Access |
-| Model Selection | Limited | Choice Between Models |
-
-## Tech Stack
-
-- Electron
-- React
-- TypeScript
-- Vite
-- Tailwind CSS
-- Radix UI Components
-- OpenAI API
-
-## How It Works
-
-1. **Initial Setup**
-   - Launch the invisible window
-   - Enter your OpenAI API key in the settings
-   - Choose your preferred model for extraction, solution generation, and debugging
-
-2. **Capturing Problem**
-   - Use global shortcut [Control or Cmd + H] to take screenshots of code problems
-   - Screenshots are automatically added to the queue of up to 2
-   - If needed, remove the last screenshot with [Control or Cmd + L]
-
-3. **Processing**
-   - Press [Control or Cmd + Enter] to analyze the screenshots
-   - AI extracts problem requirements from the screenshots using GPT-4 Vision API
-   - The model generates an optimal solution based on the extracted information
-   - All analysis is done using your personal OpenAI API key
-
-4. **Solution & Debugging**
-   - View the generated solutions with detailed explanations
-   - Use debugging feature by taking more screenshots of error messages or code
-   - Get structured analysis with identified issues, corrections, and optimizations
-   - Toggle between solutions and queue views as needed
-
-5. **Window Management**
-   - Move window using [Control or Cmd + Arrow keys]
-   - Toggle visibility with [Control or Cmd + B]
-   - Adjust opacity with [Control or Cmd + [] and [Control or Cmd + ]]
-   - Window remains invisible to specified screen sharing applications
-   - Start a new problem using [Control or Cmd + R]
-
-6. **Language Selection
-
-   - Easily switch between programming languages with a single click
-   - Use arrow keys for keyboard navigation through available languages
-   - The system dynamically adapts to any languages added or removed from the codebase
-   - Your language preference is saved between sessions
-
-## Adding More AI Models
-
-This application is built with extensibility in mind. You can easily add support for additional LLMs alongside the existing OpenAI integration:
-
-- You can add Claude, Deepseek, Grok, or any other AI model as alternative options
-- The application architecture allows for multiple LLM backends to coexist
-- Users can have the freedom to choose their preferred AI provider
-
-To add new models, simply extend the API integration in `electron/ProcessingHelper.ts` and add the corresponding UI options in `src/components/Settings/SettingsDialog.tsx`. The modular design makes this straightforward without disrupting existing functionality.
-
-## Configuration
-
-- **OpenAI API Key**: Your personal API key is stored locally and only used for API calls to OpenAI
-- **Model Selection**: You can choose between GPT-4o and GPT-4o-mini for each stage of processing:
-  - Problem Extraction: Analyzes screenshots to understand the coding problem
-  - Solution Generation: Creates optimized solutions with explanations
-  - Debugging: Provides detailed analysis of errors and improvement suggestions
-- **Language**: Select your preferred programming language for solutions
-- **Window Controls**: Adjust opacity, position, and zoom level using keyboard shortcuts
-- **All settings are stored locally** in your user data directory and persist between sessions
-
-## License
-
-This project is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0).
-
-### What This Means
-
-- You are free to use, modify, and distribute this software
-- If you modify the code, you must make your changes available under the same license
-- If you run a modified version on a network server, you must make the source code available to users
-- We strongly encourage you to contribute improvements back to the main project
-
-See the [LICENSE-SHORT](LICENSE-SHORT) file for a summary of terms or visit [GNU AGPL-3.0](https://www.gnu.org/licenses/agpl-3.0.html) for the full license text.
-
-### Contributing
-
-We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for more information.
-
-## Disclaimer and Ethical Usage
-
-This tool is intended as a learning aid and practice assistant. While it can help you understand problems and solution approaches during interviews, consider these ethical guidelines:
-
-- Be honest about using assistance tools if asked directly in an interview
-- Use this tool to learn concepts, not just to get answers
-- Recognize that understanding solutions is more valuable than simply presenting them
-- In take-home assignments, make sure you thoroughly understand any solutions you submit
-
-Remember that the purpose of technical interviews is to assess your problem-solving skills and understanding. This tool works best when used to enhance your learning, not as a substitute for it.
-
-## Support and Questions
-
-If you have questions or need support, please open an issue on the GitHub repository.
+## 贡献指南
+欢迎通过 Issue 或 Pull Request 反馈 bug、扩展功能或改进提示词。提交前请确认：
+- 已执行 npm run lint
+- 相关文档（如 README、脚本说明）同步更新
 
 ---
-
-> **Remember:** This is a community resource. If you find it valuable, consider contributing rather than just requesting features. The project grows through collective effort, not individual demands.
+保持开源、免费与透明是本项目的初衷，愿它帮助你在算法与工程面试中更高效地练习、复盘与提高。

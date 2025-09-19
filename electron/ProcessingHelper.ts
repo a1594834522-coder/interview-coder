@@ -487,7 +487,7 @@ export class ProcessingHelper {
       
       // Step 1: Extract problem info using AI Vision API (OpenAI or Gemini)
       const imageDataList = screenshots.map(screenshot => screenshot.data);
-      const extractionInstruction = `You are an interview task interpreter supporting coding, math, logical reasoning, reading comprehension, and analytical prompts.\nReturn ONLY valid JSON with the following fields:\n{\n  \"question_type\": \"coding | reading_comprehension | logical_reasoning | data_interpretation | math | other\",\n  \"problem_statement\": \"...\",\n  \"constraints\": \"...\",\n  \"example_input\": \"...\",\n  \"example_output\": \"...\",\n  \"answer_expectations\": \"...\",\n  \"supporting_material\": \"...\",\n  \"evaluation_focus\": \"...\",\n  \"language_hint\": \"...\"\n}\nRules:\n- Use complete sentences when summarizing textual prompts.\n- Use \"N/A\" if a field is not provided.\n- Set \"language_hint\" to the requested programming language. If the task is not coding or no language is specified, set it to \"N/A\".\n- Do not include markdown code fences or commentary outside of the JSON body.`;
+      const extractionInstruction = `You are an interview task interpreter supporting coding, math, logical reasoning, reading comprehension, and analytical prompts.\nReturn ONLY valid JSON with the following fields:\n{\n  \"problem_statement\": \"...\",\n  \"constraints\": \"...\",\n  \"example_input\": \"...\",\n  \"example_output\": \"...\",\n  \"answer_expectations\": \"...\",\n  \"supporting_material\": \"...\",\n  \"evaluation_focus\": \"...\",\n  \"language_hint\": \"...\"\n}\nRules:\n- Use complete sentences when summarizing textual prompts.\n- Use \"N/A\" if a field is not provided.\n- Set \"language_hint\" to the requested programming language. If the task is not coding or no language is specified, set it to \"N/A\".\n- Do not include markdown code fences or commentary outside of the JSON body.`;
       const extractionUserPrompt = `Analyze the uploaded screenshots and populate the schema above. The user's preferred coding language is ${language}. Respect any language explicitly requested in the task.`;
 
       let problemInfo: any | null = null;
@@ -561,7 +561,8 @@ export class ProcessingHelper {
           const instruction = `请阅读我接下来提供的题目截图：
 1) 如果是单选题：只需在第一行输出“最终答案：A/B/C/D”中的一个字母；第二行用不超过20个字解释原因。
 2) 如果是代码题：直接给出完整、可运行、通过常见边界案例的代码。使用题面或常规默认语言；如题面未指定，优先使用 ${language}。请用 Markdown 代码块标注语言，例如 \`\`\`${language}\n...\`\`\`。解释尽量简短。
-3) 不要输出JSON，也不要多余前言。`;
+3) 如果是代码题则给出可复制的代码，如果是选择题（阅读理解或图形逻辑）则给出具体ABCD选项。
+4) 不要输出JSON，也不要多余前言。`;
 
           const body: any = {
             contents: [
@@ -637,7 +638,6 @@ export class ProcessingHelper {
               answer_type: "code" as const,
               content: code,
               code,
-              question_type: "coding",
               thoughts: ["依据题意给出可运行实现"],
               time_complexity: undefined,
               space_complexity: undefined
@@ -656,22 +656,19 @@ export class ProcessingHelper {
               answer_type: "analysis" as const,
               content: fullText,
               final_answer: letter || undefined,
-              question_type: "multiple_choice",
               thoughts: undefined,
               key_takeaways: letter ? [`正确选项：${letter}`] : undefined
             };
           }
 
           let reasoningSteps: string[] = ["根据题意提供解决方案"];
-          const qtype = codeBlockMatch ? "coding" : (formattedResponse.final_answer ? "multiple_choice" : "other");
 
           problemInfo = {
-            question_type: qtype,
             problem_statement: "题目来自截图内容",
             constraints: "N/A",
             example_input: "N/A",
             example_output: "N/A",
-            answer_expectations: qtype.includes("code") ? "提供可运行且正确的代码" : "回答选择题并提供理由",
+            answer_expectations: "根据题意给出最优解答",
             supporting_material: "N/A",
             evaluation_focus: "答案准确性",
             language_hint: "N/A",
@@ -877,7 +874,6 @@ export class ProcessingHelper {
           answer_type: "analysis" as const,
           content: `最终答案：${finalAnswer}\n理由：${finalExplanation}`,
           final_answer: finalAnswer,
-          question_type: problemInfo.question_type || "multiple_choice",
           thoughts: reasoningSteps.length > 0 ? reasoningSteps : ["模型依据截图给出答案"],
           key_takeaways: [
             `正确选项：${finalAnswer}`,
@@ -890,10 +886,6 @@ export class ProcessingHelper {
 
       // Update progress status
       // Create prompt for solution generation
-      const questionTypeRaw = (problemInfo.question_type || "coding").toString().toLowerCase();
-      const normalizedQuestionType = questionTypeRaw.replace(/_/g, " ");
-      const isCodingTask = questionTypeRaw.includes("code");
-
       const hasValue = (value: unknown): value is string =>
         typeof value === "string" && value.trim() !== "" && value.trim().toLowerCase() !== "n/a";
 
@@ -909,9 +901,7 @@ export class ProcessingHelper {
 
       const answerExpectations = hasValue(problemInfo.answer_expectations)
         ? problemInfo.answer_expectations
-        : isCodingTask
-          ? "Provide the most accurate and efficient solution."
-          : "Provide the most accurate and complete answer.";
+        : "Provide the most accurate and complete answer.";
       const supportingMaterial = hasValue(problemInfo.supporting_material)
         ? problemInfo.supporting_material
         : "N/A";
@@ -926,79 +916,48 @@ ${supportingMaterial}
 `
         : "";
 
-      const codingPrompt = `
-Please respond in Simplified Chinese for all narrative sections while keeping the source code in ${language}.
+      const systemPrompt = "You are an interview assistant who always follows task instructions precisely and delivers concise, high-quality answers.";
 
-Generate a detailed solution for the following coding problem:
+      const userPrompt = `
+请使用简体中文完成回答，并严格遵守以下原则：
+- 如果是代码题则给出可复制的代码（使用 Markdown 代码块，并标注语言为 ${language}），并在代码后说明 Time complexity 与 Space complexity。
+- 如果是选择题（阅读理解或图形逻辑等），请在开头明确写出“最终答案：A/B/C/D”，并给出简洁理由。
+- 特别提示：如果是代码题则给出可复制的代码，如果是选择题（阅读理解或图形逻辑）则给出具体ABCD选项。
+- 其他题型请给出最优方案或结论，并确保论述清晰。
 
-QUESTION TYPE: ${normalizedQuestionType}
-PROBLEM STATEMENT:
+题目信息：
 ${problemInfo.problem_statement}
 
-CONSTRAINTS:
+约束条件：
 ${constraintsText}
 
-EXAMPLE INPUT:
+示例输入：
 ${exampleInputText}
 
-EXAMPLE OUTPUT:
+示例输出：
 ${exampleOutputText}
 
-ANSWER EXPECTATIONS:
+作答期望：
 ${answerExpectations}
 
-${supportingMaterialBlock}EVALUATION FOCUS:
+${supportingMaterialBlock}评估重点：
 ${evaluationFocus}
 
-LANGUAGE: ${language}
-
-Respond with (headings may stay in English, but the content under each heading must be in Simplified Chinese):
-1. Code: Provide a clean, optimized implementation in ${language}
-2. Your Thoughts: List key insights and reasoning behind your approach in Simplified Chinese
-3. Time complexity: Give Big-O notation plus a detailed (2+ sentence) explanation in Simplified Chinese
-4. Space complexity: Give Big-O notation plus a detailed (2+ sentence) explanation in Simplified Chinese
-
-Ensure the solution handles edge cases and includes brief inline comments in ${language} if useful.
-`;
-
-      const generalPrompt = `
-Please answer entirely in Simplified Chinese while retaining the section headings below.
-
-Task type: ${normalizedQuestionType}
-PROMPT:
-${problemInfo.problem_statement}
-
-ANSWER EXPECTATIONS:
-${answerExpectations}
-
-${supportingMaterialBlock}EVALUATION FOCUS:
-${evaluationFocus}
-
-Respond in Markdown with these exact sections (content in Simplified Chinese):
+请按照以下结构输出（保留英文标题，内容使用简体中文）：
 
 ### Final Answer
-Provide the polished answer or recommendation in a few focused sentences, written in Simplified Chinese.
+- 直接给出最终答案或代码，如为选择题请以“最终答案：A/B/C/D”开头。
 
 ### Reasoning Steps
-List numbered steps that show how you reached the answer in Simplified Chinese, citing any supporting material.
+- 列出编号步骤，解释推导过程或代码思路。
 
 ### Key Takeaways
-Provide 3 concise bullet points in Simplified Chinese highlighting what the candidate should remember.
-
-Keep the tone professional and align your answer with the evaluation focus.
+- 给出 3 个要点，帮助快速回顾关键信息。
 `;
-
-      const systemPrompt = isCodingTask
-        ? "You are an expert coding interview assistant. Provide clear, optimal solutions with detailed explanations."
-        : `You are an interview assistant specialized in ${normalizedQuestionType} tasks. Provide rigorous yet concise answers grounded in the available information.`;
-
-      const userPrompt = isCodingTask ? codingPrompt : generalPrompt;
 
       if (mainWindow) {
         mainWindow.webContents.send("processing-status", {
-          message: isCodingTask
-            ? "Creating optimal solution with detailed explanations..."
-            : "Formulating a structured interview response...",
+          message: "Formulating answer based on screenshots...",
           progress: 60
         });
       }
@@ -1087,8 +1046,6 @@ ${userPrompt}`
 
         const defaultProblemInfo = {
 
-          question_type: 'coding',
-
           constraints: 'N/A',
 
           example_input: 'N/A',
@@ -1117,18 +1074,6 @@ ${userPrompt}`
 
 
 
-        if (typeof normalizedProblemInfo.question_type === 'string') {
-
-          normalizedProblemInfo.question_type = normalizedProblemInfo.question_type.toLowerCase();
-
-        } else {
-
-          normalizedProblemInfo.question_type = 'coding';
-
-        }
-
-
-
         if (typeof normalizedProblemInfo.language_hint !== 'string' || normalizedProblemInfo.language_hint.trim() === '') {
 
           normalizedProblemInfo.language_hint = language;
@@ -1139,11 +1084,7 @@ ${userPrompt}`
 
         if (!normalizedProblemInfo.answer_expectations || normalizedProblemInfo.answer_expectations.trim() === '' || normalizedProblemInfo.answer_expectations.trim().toLowerCase() === 'n/a') {
 
-          normalizedProblemInfo.answer_expectations = normalizedProblemInfo.question_type.includes('code')
-
-            ? 'Provide the most accurate and efficient solution.'
-
-            : 'Provide the most accurate and complete answer.';
+          normalizedProblemInfo.answer_expectations = 'Provide the most accurate and complete answer.';
 
         }
 
@@ -1171,14 +1112,14 @@ ${userPrompt}`
 
       // Extract parts from the response
 
-      // Extract parts from the response
       if (!responseContent) {
         throw new Error("No content returned from the model");
       }
 
-      if (!isCodingTask) {
+      const normalizedContent = responseContent.replace(/\r\n/g, '\n');
+      const codeMatch = normalizedContent.match(/```(?:\w+)?\s*([\s\S]*?)```/);
 
-        const normalizedContent = responseContent.replace(/\r\n/g, '\n');
+      if (!codeMatch) {
 
         const finalAnswerSection = normalizedContent.match(/###\s*Final Answer\s*([\s\S]*?)(?=###|$)/i);
 
@@ -1252,9 +1193,7 @@ ${userPrompt}`
 
           space_complexity: 'N/A - Not a coding task',
 
-          key_takeaways: keyTakeaways.length > 0 ? keyTakeaways : undefined,
-
-          question_type: normalizedQuestionType
+          key_takeaways: keyTakeaways.length > 0 ? keyTakeaways : undefined
 
         };
 
@@ -1265,10 +1204,6 @@ ${userPrompt}`
       }
 
 
-
-      const normalizedContent = responseContent.replace(/\r\n/g, '\n');
-
-      const codeMatch = normalizedContent.match(/```(?:\w+)?\s*([\s\S]*?)```/);
 
       const code = codeMatch ? codeMatch[1].trim() : normalizedContent;
 
@@ -1352,8 +1287,7 @@ ${userPrompt}`
         thoughts: thoughts.length > 0 ? thoughts : ["Solution approach based on efficiency and readability"],
         time_complexity: timeComplexity,
         space_complexity: spaceComplexity,
-        key_takeaways: undefined,
-        question_type: normalizedQuestionType
+        key_takeaways: undefined
       };
 
       return { success: true, data: formattedResponse };

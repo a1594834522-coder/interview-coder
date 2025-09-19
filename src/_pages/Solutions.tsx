@@ -6,7 +6,7 @@ import { dracula } from "react-syntax-highlighter/dist/esm/styles/prism"
 
 import ScreenshotQueue from "../components/Queue/ScreenshotQueue"
 
-import { ProblemStatementData, SolutionPayload, AnswerType, QuestionType } from "../types/solutions"
+import { ProblemStatementData, SolutionPayload, AnswerType } from "../types/solutions"
 import SolutionCommands from "../components/Solutions/SolutionCommands"
 import Debug from "./Debug"
 import { useToast } from "../contexts/toast"
@@ -200,30 +200,11 @@ const Solutions: React.FC<SolutionsProps> = ({
   )
   const [answerType, setAnswerType] = useState<AnswerType>("code")
   const [keyTakeawaysData, setKeyTakeawaysData] = useState<string[] | null>(null)
-  const [questionType, setQuestionType] = useState<QuestionType | null>(null)
 
   const [isTooltipVisible, setIsTooltipVisible] = useState(false)
   const [tooltipHeight, setTooltipHeight] = useState(0)
 
   const [isResetting, setIsResetting] = useState(false)
-
-  const allowedQuestionTypes: QuestionType[] = [
-    "coding",
-    "reading_comprehension",
-    "logical_reasoning",
-    "data_interpretation",
-    "math",
-    "other"
-  ];
-
-  const normalizeQuestionType = (value?: string | null): QuestionType | null => {
-    if (!value) {
-      return null;
-    }
-
-    const cleaned = value.toLowerCase() as QuestionType;
-    return allowedQuestionTypes.includes(cleaned) ? cleaned : null;
-  };
 
   const hasDisplayValue = (value?: string | null): value is string => {
     if (value === undefined || value === null) {
@@ -241,7 +222,6 @@ const Solutions: React.FC<SolutionsProps> = ({
       setSpaceComplexityData(null);
       setAnswerType("code");
       setKeyTakeawaysData(null);
-      setQuestionType(null);
       return;
     }
 
@@ -251,11 +231,6 @@ const Solutions: React.FC<SolutionsProps> = ({
     setSpaceComplexityData(payload.space_complexity ?? null);
     setAnswerType(payload.answer_type ?? "code");
     setKeyTakeawaysData(payload.key_takeaways ?? null);
-
-    const normalized = normalizeQuestionType(payload.question_type ?? null);
-    if (normalized) {
-      setQuestionType(normalized);
-    }
   };
 
   interface Screenshot {
@@ -267,11 +242,6 @@ const Solutions: React.FC<SolutionsProps> = ({
 
   const [extraScreenshots, setExtraScreenshots] = useState<Screenshot[]>([])
 
-  const effectiveQuestionType =
-    questionType ||
-    normalizeQuestionType(problemStatementData?.question_type ?? null) ||
-    "coding";
-  const isCodingTask = effectiveQuestionType === "coding";
 
   useEffect(() => {
     const fetchScreenshots = async () => {
@@ -366,7 +336,6 @@ const Solutions: React.FC<SolutionsProps> = ({
       }),
       window.electronAPI.onProblemExtracted((data) => {
         queryClient.setQueryData(["problem_statement"], data)
-        setQuestionType(normalizeQuestionType(data?.question_type ?? null))
       }),
       //if there was an error processing the initial solution
       window.electronAPI.onSolutionError((error: string) => {
@@ -393,8 +362,7 @@ const Solutions: React.FC<SolutionsProps> = ({
           thoughts: data.thoughts || [],
           time_complexity: data.time_complexity ?? null,
           space_complexity: data.space_complexity ?? null,
-          key_takeaways: Array.isArray(data.key_takeaways) ? data.key_takeaways : undefined,
-          question_type: data.question_type
+          key_takeaways: Array.isArray(data.key_takeaways) ? data.key_takeaways : undefined
         }
 
         queryClient.setQueryData(["solution"], normalizedSolution)
@@ -460,7 +428,6 @@ const Solutions: React.FC<SolutionsProps> = ({
   useEffect(() => {
     const cachedProblem = queryClient.getQueryData(["problem_statement"]) as ProblemStatementData | null
     setProblemStatementData(cachedProblem || null)
-    setQuestionType(normalizeQuestionType(cachedProblem?.question_type ?? null))
 
     applySolutionState(
       (queryClient.getQueryData(["solution"]) as SolutionPayload | null) ?? null
@@ -470,7 +437,6 @@ const Solutions: React.FC<SolutionsProps> = ({
       if (event?.query.queryKey[0] === "problem_statement") {
         const updatedProblem = queryClient.getQueryData(["problem_statement"]) as ProblemStatementData | null
         setProblemStatementData(updatedProblem || null)
-        setQuestionType(normalizeQuestionType(updatedProblem?.question_type ?? null))
       }
       if (event?.query.queryKey[0] === "solution") {
         const solution = queryClient.getQueryData(["solution"]) as SolutionPayload | null
@@ -525,8 +491,8 @@ const Solutions: React.FC<SolutionsProps> = ({
           setLanguage={setLanguage}
         />
       ) : (
-        <div ref={contentRef} className="relative">
-          <div className="space-y-3 px-4 py-3">
+        <div ref={contentRef} className="relative inline-block bg-transparent">
+          <div className="space-y-3 px-4 py-3 inline-block">
           {/* Screenshot queue + command bar */}
           <div className="bg-transparent w-fit">
             <div className="space-y-3 w-fit">
@@ -545,13 +511,12 @@ const Solutions: React.FC<SolutionsProps> = ({
                 credits={credits}
                 currentLanguage={currentLanguage}
                 setLanguage={setLanguage}
-                isCodingTask={isCodingTask}
               />
             </div>
           </div>
 
           {/* Main Content - Modified width constraints */}
-          <div className="w-full text-sm text-black bg-black/60 rounded-md">
+          <div className="inline-block max-w-[640px] w-full text-sm text-black bg-black/60 rounded-md">
             <div className="rounded-lg overflow-hidden">
               <div className="px-4 py-3 space-y-4 max-w-full">
                 {!solutionData && (
@@ -561,7 +526,7 @@ const Solutions: React.FC<SolutionsProps> = ({
                       content={problemStatementData?.problem_statement}
                       isLoading={!problemStatementData}
                     />
-                    {hasDisplayValue(problemStatementData?.constraints) && isCodingTask && (
+                    {hasDisplayValue(problemStatementData?.constraints) && (
                       <ContentSection
                         title="Constraints"
                         content={problemStatementData?.constraints}
@@ -596,7 +561,7 @@ const Solutions: React.FC<SolutionsProps> = ({
                     {problemStatementData && (
                       <div className="mt-4 flex">
                         <p className="text-xs bg-gradient-to-r from-gray-300 via-gray-100 to-gray-300 bg-clip-text text-transparent animate-pulse">
-                          Generating {isCodingTask ? "solutions" : "responses"}...
+                          Generating solution...
                         </p>
                       </div>
                     )}
@@ -639,7 +604,8 @@ const Solutions: React.FC<SolutionsProps> = ({
                       isLoading={!solutionData}
                       currentLanguage={currentLanguage}
                       answerType={answerType}
-                    />                    {answerType !== "code" && keyTakeawaysData && keyTakeawaysData.length > 0 && (
+                    />
+                    {answerType !== "code" && keyTakeawaysData && keyTakeawaysData.length > 0 && (
                       <ContentSection
                         title="Key Takeaways"
                         content={

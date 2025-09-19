@@ -259,8 +259,8 @@ const Debug: React.FC<DebugProps> = ({
   }
 
   return (
-    <div ref={contentRef} className="relative">
-      <div className="space-y-3 px-4 py-3">
+    <div ref={contentRef} className="relative inline-block bg-transparent">
+      <div className="space-y-3 px-4 py-3 inline-block">
       {/* Screenshot queue + command bar */}
       <div className="bg-transparent w-fit">
         <div className="space-y-3 w-fit">
@@ -270,21 +270,20 @@ const Debug: React.FC<DebugProps> = ({
             isLoading={isProcessing}
           />
 
-          <SolutionCommands
-            screenshots={screenshots}
-            onTooltipVisibilityChange={handleTooltipVisibilityChange}
-            isProcessing={isProcessing}
-            extraScreenshots={screenshots}
-            credits={window.__CREDITS__}
-            currentLanguage={currentLanguage}
-            setLanguage={setLanguage}
-            isCodingTask={true}
-          />
+      <SolutionCommands
+        screenshots={screenshots}
+        onTooltipVisibilityChange={handleTooltipVisibilityChange}
+        isProcessing={isProcessing}
+        extraScreenshots={screenshots}
+        credits={window.__CREDITS__}
+        currentLanguage={currentLanguage}
+        setLanguage={setLanguage}
+      />
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="w-full text-sm text-black bg-black/60 rounded-md">
+      <div className="inline-block max-w-[640px] w-full text-sm text-black bg-black/60 rounded-md">
         <div className="rounded-lg overflow-hidden">
           <div className="px-4 py-3 space-y-4">
             {/* Thoughts Section */}

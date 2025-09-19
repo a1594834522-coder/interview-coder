@@ -13,7 +13,6 @@ export interface SolutionCommandsProps {
   credits: number
   currentLanguage: string
   setLanguage: (language: string) => void
-  isCodingTask: boolean
 }
 
 const handleSignOut = async () => {
@@ -36,8 +35,7 @@ const SolutionCommands: React.FC<SolutionCommandsProps> = ({
   extraScreenshots = [],
   credits: _credits,
   currentLanguage,
-  setLanguage,
-  isCodingTask
+  setLanguage
 }) => {
   void _credits;
   const [isTooltipVisible, setIsTooltipVisible] = useState(false)
@@ -113,7 +111,7 @@ const SolutionCommands: React.FC<SolutionCommandsProps> = ({
               >
                 <span className="text-[11px] leading-none truncate">
                   {extraScreenshots.length === 0
-                    ? (isCodingTask ? "Screenshot your code" : "Screenshot context")
+                    ? "Capture screenshot"
                     : "Screenshot"}
                 </span>
                 <div className="flex gap-1">
@@ -126,7 +124,7 @@ const SolutionCommands: React.FC<SolutionCommandsProps> = ({
                 </div>
               </div>
 
-              {isCodingTask && extraScreenshots.length > 0 && (
+              {extraScreenshots.length > 0 && (
                 <div
                   className="flex items-center gap-2 cursor-pointer rounded px-2 py-1.5 hover:bg-white/10 transition-colors"
                   onClick={async () => {
@@ -311,7 +309,7 @@ const SolutionCommands: React.FC<SolutionCommandsProps> = ({
                             }}
                           >
                             <div className="flex items-center justify-between">
-                              <span className="truncate">{isCodingTask ? "Take Screenshot" : "Capture Context"}</span>
+                              <span className="truncate">Capture Screenshot</span>
                               <div className="flex gap-1 flex-shrink-0">
                                 <span className="bg-white/20 px-1.5 py-0.5 rounded text-[10px] leading-none">
                                   {COMMAND_KEY}
@@ -327,7 +325,7 @@ const SolutionCommands: React.FC<SolutionCommandsProps> = ({
                             </p>
                           </div>
 
-                          {isCodingTask && extraScreenshots.length > 0 && (
+                          {extraScreenshots.length > 0 && (
                             <div
                               className="cursor-pointer rounded px-2 py-1.5 hover:bg-white/10 transition-colors"
                               onClick={async () => {
@@ -414,12 +412,10 @@ const SolutionCommands: React.FC<SolutionCommandsProps> = ({
 
                     {/* Separator and Log Out */}
                     <div className="pt-3 mt-3 border-t border-white/10">
-                      {isCodingTask && (
-                        <LanguageSelector
-                          currentLanguage={currentLanguage}
-                          setLanguage={setLanguage}
-                        />
-                      )}
+                      <LanguageSelector
+                        currentLanguage={currentLanguage}
+                        setLanguage={setLanguage}
+                      />
 
                       {/* API Key Settings */}
                       <div className="mb-3 px-2 space-y-1">
