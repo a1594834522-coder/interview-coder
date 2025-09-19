@@ -88,6 +88,8 @@ export class ConfigHelper extends EventEmitter {
     return model;
   }
 
+  // 仅保留原有配置逻辑，未引入额外的 Gemini Base URL 可变更
+
   public loadConfig(): Config {
     try {
       if (fs.existsSync(this.configPath)) {
