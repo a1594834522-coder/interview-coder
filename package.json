@@ -48,12 +48,21 @@
           ]
         }
       ],
-      "artifactName": "Interview-Coder-${arch}.${ext}",
+      "artifactName": "Interview-Coder-mac-${arch}-v${version}.${ext}",
       "icon": "assets/icons/mac/icon.icns",
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist",
+      "extendInfo": {
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        },
+        "NSCameraUsageDescription": "Interview Coder需要访问摄像头用于功能扩展",
+        "NSMicrophoneUsageDescription": "Interview Coder需要访问麦克风用于语音功能",
+        "NSScreenCaptureUsageDescription": "Interview Coder需要截图权限来捕获和分析代码问题",
+        "NSAppleEventsUsageDescription": "Interview Coder需要此权限来管理窗口和屏幕捕捉"
+      },
       "identity": "Developer ID Application",
       "notarize": true,
       "protocols": {

@@ -1193,7 +1193,7 @@ ${userPrompt}`
 
           space_complexity: 'N/A - Not a coding task',
 
-          key_takeaways: keyTakeaways.length > 0 ? keyTakeaways : undefined
+          key_takeaways: (keyTakeaways.length > 0 ? keyTakeaways : undefined) as string[] | undefined
 
         };
 
@@ -1287,7 +1287,7 @@ ${userPrompt}`
         thoughts: thoughts.length > 0 ? thoughts : ["Solution approach based on efficiency and readability"],
         time_complexity: timeComplexity,
         space_complexity: spaceComplexity,
-        key_takeaways: undefined
+        key_takeaways: undefined as string[] | undefined
       };
 
       return { success: true, data: formattedResponse };

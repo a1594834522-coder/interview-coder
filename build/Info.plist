@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDisplayName</key>
+    <string>Interview Coder</string>
+    <key>CFBundleName</key>
+    <string>Interview Coder</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.chunginlee.interviewcoder</string>
+    <key>CFBundleVersion</key>
+    <string>1.0.19</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0.19</string>
+    <key>LSUIElement</key>
+    <true/>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Interview Coder需要访问麦克风以支持语音功能（如需要）。</string>
+    <key>NSCameraUsageDescription</key>
+    <string>Interview Coder需要访问摄像头以支持相机功能（如需要）。</string>
+    <key>NSScreenCaptureUsageDescription</key>
+    <string>Interview Coder需要截图权限来捕获代码问题并进行分析。</string>
+    <key>NSDesktopFolderUsageDescription</key>
+    <string>Interview Coder需要访问桌面以保存截图和分析结果。</string>
+    <key>NSDownloadsFolderUsageDescription</key>
+    <string>Interview Coder需要访问下载文件夹以保存分析结果。</string>
+    <key>CFBundleDocumentTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleTypeName</key>
+            <string>Interview Coder Protocol Handler</string>
+            <key>CFBundleTypeRole</key>
+            <string>Editor</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>interview-coder</string>
+            </array>
+        </dict>
+    </array>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>Interview Coder需要此权限以管理窗口和屏幕捕捉功能。</string>
+    <key>NSTrustedBSDMarkers</key>
+    <true/>
+</dict>
+</plist>

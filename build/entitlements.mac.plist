@@ -16,5 +16,16 @@
     <true/>
     <key>com.apple.security.network.client</key>
     <true/>
+    <!-- 添加屏幕录制权限 -->
+    <key>com.apple.security.temporary-exception.apple-events</key>
+    <array>
+      <string>com.apple.systemevents</string>
+    </array>
+    <!-- 添加屏幕捕捉权限 -->
+    <key>com.apple.security.temporary-exception.mach-lookup.global-name</key>
+    <array>
+      <string>com.apple.cvmsServ</string>
+      <string>com.apple.trustd</string>
+    </array>
   </dict>
-</plist> 
+</plist>

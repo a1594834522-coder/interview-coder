@@ -25,6 +25,27 @@
        stealth-run.bat
 
    脚本会自动清理旧构建、重新打包并以隐身模式启动应用。
+
+
+Mac 用户运行 Interview Coder（开源版）的步骤
+
+  1. 前提准备：
+    - 确保 macOS 13 或更高版本。
+    - 安装 Node.js 18 或更新版本（从官网下载安装）。
+    - 克隆项目仓库到本地目录（如 git clone <repo-url> interview-coder）。
+    - 进入项目目录：cd interview-coder。
+    - 安装依赖：npm install。
+  2. 授予权限：
+    - 在“系统设置 → 隐私与安全性 → 屏幕录制”中，勾选 Terminal（或你的 IDE），允许全局快捷键和截图功能。
+    - 若需动态权限，应用启动后可能需额外授权。
+  3. 启动应用：
+    - 该项目提供 stealth-run.sh 脚本（隐身模式启动，默认窗口不可见）。
+    - 赋予执行权限：chmod +x stealth-run.sh。
+    - 运行脚本：./stealth-run.sh。
+        - 脚本会自动清理旧构建、执行 npm run build，然后后台启动 Electron 应用。
+    - 首次运行可能需几分钟构建。
+
+
 3. 启动后按 Ctrl + B 显示主窗口，在设置面板中填写 API Key 后即可使用。（推荐使用gemini2.5flash）
 
 ### 常用快捷键

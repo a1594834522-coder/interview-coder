@@ -158,21 +158,65 @@ export class ScreenshotHelper {
     try {
       console.log("Starting screenshot capture...");
 
-      // For Windows, try multiple methods
+      // 平台特定的屏幕截图处理
       if (process.platform === "win32") {
         return await this.captureWindowsScreenshot();
+      } else if (process.platform === "darwin") {
+        return await this.captureMacScreenshot();
+      } else {
+        // Linux and other platforms
+        console.log("Taking screenshot on Linux/other platform");
+        const buffer = await screenshot({ format: "png" });
+        console.log(
+          `Screenshot captured successfully, size: ${buffer.length} bytes`
+        );
+        return buffer;
       }
-
-      // For macOS and Linux, use buffer directly
-      console.log("Taking screenshot on non-Windows platform");
-      const buffer = await screenshot({ format: "png" });
-      console.log(
-        `Screenshot captured successfully, size: ${buffer.length} bytes`
-      );
-      return buffer;
     } catch (error) {
       console.error("Error capturing screenshot:", error);
       throw new Error(`Failed to capture screenshot: ${error.message}`);
+    }
+  }
+
+  /**
+   * macOS-specific screenshot capture with native screencapture utility
+   */
+  private async captureMacScreenshot(): Promise<Buffer> {
+    console.log("Attempting macOS screenshot with native screencapture")
+    try {
+      const tempFile = path.join(this.tempDir, `mac-temp-${uuidv4()}.png`)
+
+      // 使用macOS自带的screencapture命令
+      await execFileAsync("screencapture", ["-x", tempFile])
+
+      if (fs.existsSync(tempFile)) {
+        const buffer = await fs.promises.readFile(tempFile)
+        console.log(`macOS screenshot successful, size: ${buffer.length} bytes`)
+
+        // 清理临时文件
+        try {
+          await fs.promises.unlink(tempFile)
+        } catch (cleanupErr) {
+          console.warn("Failed to clean up temp file:", cleanupErr)
+        }
+
+        return buffer
+      } else {
+        throw new Error("macOS screenshot file not created")
+      }
+    } catch (error) {
+      console.warn("Native screencapture failed, trying fallback method:", error)
+
+      try {
+        // 尝试使用screenshot-desktop作为备选
+        const buffer = await screenshot({ format: "png" })
+        return buffer
+      } catch (screenshotError) {
+        console.error("macOS screenshot completely failed:", screenshotError)
+        throw new Error(
+          "无法截取屏幕。请确保在“系统偏好设置 > 安全性与隐私 > 屏幕录制”中允许此应用访问。"
+        )
+      }
     }
   }
 
