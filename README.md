@@ -1,6 +1,8 @@
 # Interview Coder（开源魔改版）
 
 这是一个面向技术面试的桌面助手，提供截图解析、AI 解题与调试、隐身窗口等功能。应用完全本地运行，需自备 OpenAI、Google Gemini 或 Anthropic 等模型的 API Key，私有数据仅在你与模型供应商之间传输。
+
+
 官网：  in.abruzz1.cn
 
 ## 功能概览
