@@ -57,22 +57,28 @@ export interface ElectronAPI {
   getConfig: () => Promise<{
     apiKey: string;
     apiProvider: "openai" | "gemini" | "anthropic";
-    extractionModel: string;
-    solutionModel: string;
-    debuggingModel: string;
+    openaiModel: string;
+    geminiModel: string;
+    anthropicModel: string;
+    openaiBaseUrl: string;
+    geminiBaseUrl: string;
+    anthropicBaseUrl: string;
     language: string;
     opacity: number;
   }>
   updateConfig: (config: {
     apiKey?: string;
     apiProvider?: "openai" | "gemini" | "anthropic";
-    extractionModel?: string;
-    solutionModel?: string;
-    debuggingModel?: string;
-    model?: string;
+    openaiModel?: string;
+    geminiModel?: string;
+    anthropicModel?: string;
+    openaiBaseUrl?: string;
+    geminiBaseUrl?: string;
+    anthropicBaseUrl?: string;
     language?: string;
     opacity?: number;
   }) => Promise<boolean>
+  setClickThrough: (ignore: boolean) => Promise<{ success: boolean; error?: string }>
   checkApiKey: () => Promise<boolean>
   validateApiKey: (apiKey: string) => Promise<{ valid: boolean; error?: string }>
   openLink: (url: string) => void

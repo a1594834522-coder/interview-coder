@@ -208,14 +208,17 @@ const electronAPI = {
   updateConfig: (config: { 
     apiKey?: string;
     apiProvider?: "openai" | "gemini" | "anthropic";
-    extractionModel?: string;
-    solutionModel?: string;
-    debuggingModel?: string;
-    model?: string;
+    openaiModel?: string;
+    geminiModel?: string;
+    anthropicModel?: string;
+    openaiBaseUrl?: string;
+    geminiBaseUrl?: string;
+    anthropicBaseUrl?: string;
     language?: string;
     opacity?: number;
   }) => 
     ipcRenderer.invoke("update-config", config),
+  setClickThrough: (ignore: boolean) => ipcRenderer.invoke("set-click-through", ignore),
   onShowSettings: (callback: () => void) => {
     const subscription = () => callback()
     ipcRenderer.on("show-settings-dialog", subscription)

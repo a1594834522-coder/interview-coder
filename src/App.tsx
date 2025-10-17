@@ -4,7 +4,7 @@ import {
   QueryClient,
   QueryClientProvider
 } from "@tanstack/react-query"
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useRef } from "react"
 import {
   Toast,
   ToastDescription,
@@ -46,6 +46,8 @@ function App() {
   // Note: Model selection is now handled via separate extraction/solution/debugging model settings
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const interactiveRegionRef = useRef<HTMLDivElement>(null)
+  const lastIgnoreStateRef = useRef<boolean | null>(null)
 
   // Set unlimited credits
   const updateCredits = useCallback(() => {
@@ -165,7 +167,7 @@ function App() {
         }
         
         // Model settings are now managed through the settings dialog
-        // and stored in config as extractionModel, solutionModel, and debuggingModel
+        // and stored in config as openaiModel, geminiModel, and anthropicModel
         
         markInitialized()
       } catch (error) {
@@ -219,11 +221,57 @@ function App() {
     setIsSettingsOpen(open);
   }, []);
 
+  useEffect(() => {
+    if (!window.electronAPI?.setClickThrough) {
+      return
+    }
+
+    const setClickThrough = (ignore: boolean) => {
+      if (lastIgnoreStateRef.current === ignore) {
+        return
+      }
+      lastIgnoreStateRef.current = ignore
+      window.electronAPI.setClickThrough(ignore).catch((error) => {
+        console.error("Failed to set click-through state:", error)
+      })
+    }
+
+    const handleMouseMove = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null
+      const container = interactiveRegionRef.current
+
+      const isInside = Boolean(
+        target &&
+          (target.closest('[data-interactive-region]') ||
+            (container && container.contains(target)))
+      )
+
+      setClickThrough(!isInside)
+    }
+
+    const handleWindowLeave = () => {
+      setClickThrough(true)
+    }
+
+    document.addEventListener("mousemove", handleMouseMove, true)
+    window.addEventListener("mouseleave", handleWindowLeave, true)
+    setClickThrough(false)
+
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove, true)
+      window.removeEventListener("mouseleave", handleWindowLeave, true)
+      lastIgnoreStateRef.current = null
+      window.electronAPI
+        .setClickThrough(false)
+        .catch((error) => console.error("Failed to reset click-through:", error))
+    }
+  }, [])
+
   return (
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
         <ToastContext.Provider value={{ showToast }}>
-          <div className="relative">
+          <div ref={interactiveRegionRef} data-interactive-region className="relative">
             {isInitialized ? (
               hasApiKey ? (
                 <SubscribedApp

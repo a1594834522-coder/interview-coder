@@ -12,180 +12,16 @@ import { Button } from "../ui/button";
 import { useToast } from "../../contexts/toast";
 
 type APIProvider = "openai" | "gemini" | "anthropic";
-
-type AIModel = {
-  id: string;
-  name: string;
-  description: string;
+const DEFAULT_MODELS: Record<APIProvider, string> = {
+  openai: "gpt5",
+  gemini: "gemini2.5flash",
+  anthropic: "claude-sonnet-4-5"
 };
 
-type ModelCategory = {
-  key: 'extractionModel' | 'solutionModel' | 'debuggingModel';
-  title: string;
-  description: string;
-  openaiModels: AIModel[];
-  geminiModels: AIModel[];
-  anthropicModels: AIModel[];
-};
-
-// Define available models for each category
-const modelCategories: ModelCategory[] = [
-  {
-    key: 'extractionModel',
-    title: 'Problem Extraction',
-    description: 'Model used to analyze screenshots and extract problem details',
-    openaiModels: [
-      {
-        id: "gpt-4o",
-        name: "gpt-4o",
-        description: "Best overall performance for problem extraction"
-      },
-      {
-        id: "gpt-4o-mini",
-        name: "gpt-4o-mini",
-        description: "Faster, more cost-effective option"
-      }
-    ],
-    geminiModels: [
-      {
-        id: "gemini-2.5-pro",
-        name: "Gemini 2.5 Pro",
-        description: "Highest accuracy for multimodal problem extraction"
-      },
-      {
-        id: "gemini-2.5-flash",
-        name: "Gemini 2.5 Flash",
-        description: "Fast option with UseContext7 extended context"
-      }
-    ],
-    anthropicModels: [
-      {
-        id: "claude-3-7-sonnet-20250219",
-        name: "Claude 3.7 Sonnet",
-        description: "Best overall performance for problem extraction"
-      },
-      {
-        id: "claude-3-5-sonnet-20241022",
-        name: "Claude 3.5 Sonnet",
-        description: "Balanced performance and speed"
-      },
-      {
-        id: "claude-3-opus-20240229",
-        name: "Claude 3 Opus",
-        description: "Top-level intelligence, fluency, and understanding"
-      }
-    ]
-  },
-  {
-    key: 'solutionModel',
-    title: 'Solution Generation',
-    description: 'Model used to generate solutions, analyses, and walkthroughs',
-    openaiModels: [
-      {
-        id: "gpt-4o",
-        name: "gpt-4o",
-        description: "Strong overall performance for coding tasks"
-      },
-      {
-        id: "gpt-4o-mini",
-        name: "gpt-4o-mini",
-        description: "Faster, more cost-effective option"
-      }
-    ],
-    geminiModels: [
-      {
-        id: "gemini-2.5-pro",
-        name: "Gemini 2.5 Pro",
-        description: "Best for mixed coding, reasoning, and comprehension tasks"
-      },
-      {
-        id: "gemini-2.5-flash",
-        name: "Gemini 2.5 Flash",
-        description: "Rapid responses for walkthroughs and iterative drafting"
-      }
-    ],
-    anthropicModels: [
-      {
-        id: "claude-3-7-sonnet-20250219",
-        name: "Claude 3.7 Sonnet",
-        description: "Strong overall performance for coding tasks"
-      },
-      {
-        id: "claude-3-5-sonnet-20241022",
-        name: "Claude 3.5 Sonnet",
-        description: "Balanced performance and speed"
-      },
-      {
-        id: "claude-3-opus-20240229",
-        name: "Claude 3 Opus",
-        description: "Top-level intelligence, fluency, and understanding"
-      }
-    ]
-  },
-  {
-    key: 'debuggingModel',
-    title: 'Debugging',
-    description: 'Model used to debug and improve solutions',
-    openaiModels: [
-      {
-        id: "gpt-4o",
-        name: "gpt-4o",
-        description: "Best for analyzing code and error messages"
-      },
-      {
-        id: "gpt-4o-mini",
-        name: "gpt-4o-mini",
-        description: "Faster, more cost-effective option"
-      }
-    ],
-    geminiModels: [
-      {
-        id: "gemini-2.5-pro",
-        name: "Gemini 2.5 Pro",
-        description: "Deep debugging context with UseContext7 awareness"
-      },
-      {
-        id: "gemini-2.5-flash",
-        name: "Gemini 2.5 Flash",
-        description: "Fast diffing and remediation suggestions"
-      }
-    ],
-    anthropicModels: [
-      {
-        id: "claude-3-7-sonnet-20250219",
-        name: "Claude 3.7 Sonnet",
-        description: "Best for analyzing code and error messages"
-      },
-      {
-        id: "claude-3-5-sonnet-20241022",
-        name: "Claude 3.5 Sonnet",
-        description: "Balanced performance and speed"
-      },
-      {
-        id: "claude-3-opus-20240229",
-        name: "Claude 3 Opus",
-        description: "Top-level intelligence, fluency, and understanding"
-      }
-    ]
-  }
-];
-
-const providerDefaults: Record<APIProvider, { extraction: string; solution: string; debugging: string }> = {
-  openai: {
-    extraction: "gpt-4o",
-    solution: "gpt-4o",
-    debugging: "gpt-4o"
-  },
-  gemini: {
-    extraction: "gemini-2.5-flash",
-    solution: "gemini-2.5-pro",
-    debugging: "gemini-2.5-flash"
-  },
-  anthropic: {
-    extraction: "claude-3-7-sonnet-20250219",
-    solution: "claude-3-7-sonnet-20250219",
-    debugging: "claude-3-7-sonnet-20250219"
-  }
+const DEFAULT_BASE_URLS: Record<APIProvider, string> = {
+  openai: "https://api.openai.com/v1",
+  gemini: "https://generativelanguage.googleapis.com",
+  anthropic: "https://api.anthropic.com"
 };
 
 interface SettingsDialogProps {
@@ -197,9 +33,12 @@ export function SettingsDialog({ open: externalOpen, onOpenChange }: SettingsDia
   const [open, setOpen] = useState(externalOpen || false);
   const [apiKey, setApiKey] = useState("");
   const [apiProvider, setApiProvider] = useState<APIProvider>("openai");
-  const [extractionModel, setExtractionModel] = useState(providerDefaults.openai.extraction);
-  const [solutionModel, setSolutionModel] = useState(providerDefaults.openai.solution);
-  const [debuggingModel, setDebuggingModel] = useState(providerDefaults.openai.debugging);
+  const [openaiModel, setOpenaiModel] = useState(DEFAULT_MODELS.openai);
+  const [geminiModel, setGeminiModel] = useState(DEFAULT_MODELS.gemini);
+  const [anthropicModel, setAnthropicModel] = useState(DEFAULT_MODELS.anthropic);
+  const [openaiBaseUrl, setOpenaiBaseUrl] = useState(DEFAULT_BASE_URLS.openai);
+  const [geminiBaseUrl, setGeminiBaseUrl] = useState(DEFAULT_BASE_URLS.gemini);
+  const [anthropicBaseUrl, setAnthropicBaseUrl] = useState(DEFAULT_BASE_URLS.anthropic);
   const [isLoading, setIsLoading] = useState(false);
   const { showToast } = useToast();
   const providerDisplayName: Record<APIProvider, string> = {
@@ -231,22 +70,27 @@ export function SettingsDialog({ open: externalOpen, onOpenChange }: SettingsDia
       interface Config {
         apiKey?: string;
         apiProvider?: APIProvider;
-        extractionModel?: string;
-        solutionModel?: string;
-        debuggingModel?: string;
+        openaiModel?: string;
+        geminiModel?: string;
+        anthropicModel?: string;
+        openaiBaseUrl?: string;
+        geminiBaseUrl?: string;
+        anthropicBaseUrl?: string;
       }
 
       window.electronAPI
         .getConfig()
         .then((config: Config) => {
           const resolvedProvider = config.apiProvider || "openai";
-          const defaults = providerDefaults[resolvedProvider];
 
           setApiKey(config.apiKey || "");
           setApiProvider(resolvedProvider);
-          setExtractionModel(config.extractionModel || defaults.extraction);
-          setSolutionModel(config.solutionModel || defaults.solution);
-          setDebuggingModel(config.debuggingModel || defaults.debugging);
+          setOpenaiModel(config.openaiModel || DEFAULT_MODELS.openai);
+          setGeminiModel(config.geminiModel || DEFAULT_MODELS.gemini);
+          setAnthropicModel(config.anthropicModel || DEFAULT_MODELS.anthropic);
+          setOpenaiBaseUrl(config.openaiBaseUrl || DEFAULT_BASE_URLS.openai);
+          setGeminiBaseUrl(config.geminiBaseUrl || DEFAULT_BASE_URLS.gemini);
+          setAnthropicBaseUrl(config.anthropicBaseUrl || DEFAULT_BASE_URLS.anthropic);
         })
         .catch((error: unknown) => {
           console.error("Failed to load config:", error);
@@ -261,13 +105,28 @@ export function SettingsDialog({ open: externalOpen, onOpenChange }: SettingsDia
   // Handle API provider change
   const handleProviderChange = (provider: APIProvider) => {
     setApiProvider(provider);
-    
-    // Reset models to defaults when changing provider
-    const defaults = providerDefaults[provider];
-
-    setExtractionModel(defaults.extraction);
-    setSolutionModel(defaults.solution);
-    setDebuggingModel(defaults.debugging);
+    if (provider === "openai") {
+      if (!openaiModel.trim()) {
+        setOpenaiModel(DEFAULT_MODELS.openai);
+      }
+      if (!openaiBaseUrl.trim()) {
+        setOpenaiBaseUrl(DEFAULT_BASE_URLS.openai);
+      }
+    } else if (provider === "gemini") {
+      if (!geminiModel.trim()) {
+        setGeminiModel(DEFAULT_MODELS.gemini);
+      }
+      if (!geminiBaseUrl.trim()) {
+        setGeminiBaseUrl(DEFAULT_BASE_URLS.gemini);
+      }
+    } else {
+      if (!anthropicModel.trim()) {
+        setAnthropicModel(DEFAULT_MODELS.anthropic);
+      }
+      if (!anthropicBaseUrl.trim()) {
+        setAnthropicBaseUrl(DEFAULT_BASE_URLS.anthropic);
+      }
+    }
   };
 
   const handleSave = async () => {
@@ -276,9 +135,12 @@ export function SettingsDialog({ open: externalOpen, onOpenChange }: SettingsDia
       const result = await window.electronAPI.updateConfig({
         apiKey,
         apiProvider,
-        extractionModel,
-        solutionModel,
-        debuggingModel,
+        openaiModel,
+        geminiModel,
+        anthropicModel,
+        openaiBaseUrl,
+        geminiBaseUrl,
+        anthropicBaseUrl,
       });
       
       if (result) {
@@ -358,7 +220,7 @@ export function SettingsDialog({ open: externalOpen, onOpenChange }: SettingsDia
                   />
                   <div className="flex flex-col">
                     <p className="font-medium text-white text-sm">OpenAI</p>
-                    <p className="text-xs text-white/60">GPT-4o models</p>
+                    <p className="text-xs text-white/60">默认模型：gpt5（可自定义）</p>
                   </div>
                 </div>
               </div>
@@ -378,7 +240,7 @@ export function SettingsDialog({ open: externalOpen, onOpenChange }: SettingsDia
                   />
                   <div className="flex flex-col">
                     <p className="font-medium text-white text-sm">Gemini</p>
-                    <p className="text-xs text-white/60">Gemini 2.5 models</p>
+                    <p className="text-xs text-white/60">默认模型：gemini2.5flash（可自定义）</p>
                   </div>
                 </div>
               </div>
@@ -398,7 +260,7 @@ export function SettingsDialog({ open: externalOpen, onOpenChange }: SettingsDia
                   />
                   <div className="flex flex-col">
                     <p className="font-medium text-white text-sm">Claude</p>
-                    <p className="text-xs text-white/60">Claude 3 models</p>
+                    <p className="text-xs text-white/60">默认模型：claude-sonnet-4-5（可自定义）</p>
                   </div>
                 </div>
               </div>
@@ -517,67 +379,85 @@ export function SettingsDialog({ open: externalOpen, onOpenChange }: SettingsDia
           </div>
           
           <div className="space-y-4 mt-4">
-            <label className="text-sm font-medium text-white">AI Model Selection</label>
+            <label className="text-sm font-medium text-white">Provider Configuration</label>
             <p className="text-xs text-white/60 -mt-3 mb-2">
-              Select which models to use for each stage of the process
+              设置每个厂商的 Base URL 与模型名称，方便接入自建代理或私有部署。
             </p>
-            
-            {modelCategories.map((category) => {
-              // Get the appropriate model list based on selected provider
-              const models = 
-                apiProvider === "openai" ? category.openaiModels : 
-                apiProvider === "gemini" ? category.geminiModels :
-                category.anthropicModels;
-              
-              return (
-                <div key={category.key} className="mb-4">
-                  <label className="text-sm font-medium text-white mb-1 block">
-                    {category.title}
-                  </label>
-                  <p className="text-xs text-white/60 mb-2">{category.description}</p>
-                  
-                  <div className="space-y-2">
-                    {models.map((m) => {
-                      // Determine which state to use based on category key
-                      const currentValue = 
-                        category.key === 'extractionModel' ? extractionModel :
-                        category.key === 'solutionModel' ? solutionModel :
-                        debuggingModel;
-                      
-                      // Determine which setter function to use
-                      const setValue = 
-                        category.key === 'extractionModel' ? setExtractionModel :
-                        category.key === 'solutionModel' ? setSolutionModel :
-                        setDebuggingModel;
-                        
-                      return (
-                        <div
-                          key={m.id}
-                          className={`p-2 rounded-lg cursor-pointer transition-colors ${
-                            currentValue === m.id
-                              ? "bg-white/10 border border-white/20"
-                              : "bg-black/30 border border-white/5 hover:bg-white/5"
-                          }`}
-                          onClick={() => setValue(m.id)}
-                        >
-                          <div className="flex items-center gap-2">
-                            <div
-                              className={`w-3 h-3 rounded-full ${
-                                currentValue === m.id ? "bg-white" : "bg-white/20"
-                              }`}
-                            />
-                            <div>
-                              <p className="font-medium text-white text-xs">{m.name}</p>
-                              <p className="text-xs text-white/60">{m.description}</p>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
+
+            {[
+              {
+                key: "openai" as APIProvider,
+                title: "OpenAI",
+                description: "兼容 OpenAI 接口的服务（包括自建兼容网关）",
+                model: openaiModel,
+                setModel: setOpenaiModel,
+                baseUrl: openaiBaseUrl,
+                setBaseUrl: setOpenaiBaseUrl
+              },
+              {
+                key: "gemini" as APIProvider,
+                title: "Gemini",
+                description: "Google Gemini 或兼容的多模态服务",
+                model: geminiModel,
+                setModel: setGeminiModel,
+                baseUrl: geminiBaseUrl,
+                setBaseUrl: setGeminiBaseUrl
+              },
+              {
+                key: "anthropic" as APIProvider,
+                title: "Anthropic",
+                description: "Claude 系列或兼容的 API",
+                model: anthropicModel,
+                setModel: setAnthropicModel,
+                baseUrl: anthropicBaseUrl,
+                setBaseUrl: setAnthropicBaseUrl
+              }
+            ].map(({ key, title, description, model, setModel, baseUrl, setBaseUrl }) => (
+              <div
+                key={key}
+                className={`rounded-lg border p-3 space-y-3 transition-colors ${
+                  apiProvider === key
+                    ? "border-white/40 bg-white/10"
+                    : "border-white/10 bg-black/30"
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-white">{title}</p>
+                    <p className="text-xs text-white/60">{description}</p>
                   </div>
+                  {apiProvider === key && (
+                    <span className="text-xs text-white/70 border border-white/30 rounded px-2 py-0.5">
+                      当前使用
+                    </span>
+                  )}
                 </div>
-              );
-            })}
+
+                <div className="space-y-2">
+                  <div>
+                    <label className="text-xs text-white/60 block mb-1">Base URL</label>
+                    <Input
+                      value={baseUrl}
+                      onChange={(event) => setBaseUrl(event.target.value)}
+                      placeholder={DEFAULT_BASE_URLS[key]}
+                      className="bg-black/40 border-white/10 text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-white/60 block mb-1">模型名称</label>
+                    <Input
+                      value={model}
+                      onChange={(event) => setModel(event.target.value)}
+                      placeholder={DEFAULT_MODELS[key]}
+                      className="bg-black/40 border-white/10 text-white"
+                    />
+                  </div>
+                  <p className="text-[10px] text-white/50">
+                    默认值：{DEFAULT_MODELS[key]} · Base URL 默认：{DEFAULT_BASE_URLS[key]}
+                  </p>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
         <DialogFooter className="flex justify-between sm:justify-between">

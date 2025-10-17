@@ -7,22 +7,73 @@ import { OpenAI } from "openai"
 
 interface Config {
   apiKey: string;
-  apiProvider: "openai" | "gemini" | "anthropic";  // Added provider selection
-  extractionModel: string;
-  solutionModel: string;
-  debuggingModel: string;
+  apiProvider: "openai" | "gemini" | "anthropic";
+  openaiModel: string;
+  geminiModel: string;
+  anthropicModel: string;
+  openaiBaseUrl: string;
+  geminiBaseUrl: string;
+  anthropicBaseUrl: string;
   language: string;
   opacity: number;
+  // Legacy fields retained for backward compatibility with existing config files
+  extractionModel?: string;
+  solutionModel?: string;
+  debuggingModel?: string;
 }
+
+const DEFAULT_MODELS = {
+  openai: "gpt5",
+  gemini: "gemini2.5flash",
+  anthropic: "claude-sonnet-4-5"
+} as const;
+
+const DEFAULT_BASE_URLS = {
+  openai: "https://api.openai.com/v1",
+  gemini: "https://generativelanguage.googleapis.com",
+  anthropic: "https://api.anthropic.com"
+} as const;
+
+const sanitizeModelForProvider = (
+  value: string,
+  provider: "openai" | "gemini" | "anthropic"
+): string => {
+  const fallback = DEFAULT_MODELS[provider];
+  const trimmed = typeof value === "string" ? value.trim() : "";
+  if (!trimmed) {
+    return fallback;
+  }
+
+  const lower = trimmed.toLowerCase();
+
+  if (provider === "openai") {
+    if (lower.includes("gemini") || lower.includes("claude")) {
+      return fallback;
+    }
+  } else if (provider === "gemini") {
+    if (lower.includes("gpt") || lower.includes("claude")) {
+      return fallback;
+    }
+  } else if (provider === "anthropic") {
+    if (lower.includes("gpt") || lower.includes("gemini")) {
+      return fallback;
+    }
+  }
+
+  return trimmed;
+};
 
 export class ConfigHelper extends EventEmitter {
   private configPath: string;
   private defaultConfig: Config = {
     apiKey: "",
     apiProvider: "gemini", // Default to Gemini
-    extractionModel: "gemini-2.5-flash", // Default to Flash for faster responses
-    solutionModel: "gemini-2.5-pro",
-    debuggingModel: "gemini-2.5-flash",
+    openaiModel: DEFAULT_MODELS.openai,
+    geminiModel: DEFAULT_MODELS.gemini,
+    anthropicModel: DEFAULT_MODELS.anthropic,
+    openaiBaseUrl: DEFAULT_BASE_URLS.openai,
+    geminiBaseUrl: DEFAULT_BASE_URLS.gemini,
+    anthropicBaseUrl: DEFAULT_BASE_URLS.anthropic,
     language: "python",
     opacity: 1.0
   };
@@ -55,70 +106,88 @@ export class ConfigHelper extends EventEmitter {
     }
   }
 
-  /**
-   * Validate and sanitize model selection to ensure only allowed models are used
-   */
-  private sanitizeModelSelection(model: string, provider: "openai" | "gemini" | "anthropic"): string {
-    if (provider === "openai") {
-      // Only allow gpt-4o and gpt-4o-mini for OpenAI
-      const allowedModels = ['gpt-4o', 'gpt-4o-mini'];
-      if (!allowedModels.includes(model)) {
-        console.warn(`Invalid OpenAI model specified: ${model}. Using default model: gpt-4o`);
-        return 'gpt-4o';
-      }
-      return model;
-    } else if (provider === "gemini")  {
-      // Only allow gemini-2.5-pro and gemini-2.5-flash for Gemini
-      const allowedModels = ['gemini-2.5-pro', 'gemini-2.5-flash'];
-      if (!allowedModels.includes(model)) {
-        console.warn(`Invalid Gemini model specified: ${model}. Using default model: gemini-2.5-flash`);
-        return 'gemini-2.5-flash'; // Changed default to flash
-      }
-      return model;
-    }  else if (provider === "anthropic") {
-      // Only allow Claude models
-      const allowedModels = ['claude-3-7-sonnet-20250219', 'claude-3-5-sonnet-20241022', 'claude-3-opus-20240229'];
-      if (!allowedModels.includes(model)) {
-        console.warn(`Invalid Anthropic model specified: ${model}. Using default model: claude-3-7-sonnet-20250219`);
-        return 'claude-3-7-sonnet-20250219';
-      }
-      return model;
-    }
-    // Default fallback
-    return model;
-  }
-
-  // 仅保留原有配置逻辑，未引入额外的 Gemini Base URL 可变更
-
   public loadConfig(): Config {
+    const ensureValue = (value: unknown, fallback: string): string => {
+      if (typeof value === "string" && value.trim().length > 0) {
+        return value.trim();
+      }
+      return fallback;
+    };
+
     try {
       if (fs.existsSync(this.configPath)) {
         const configData = fs.readFileSync(this.configPath, 'utf8');
-        const config = JSON.parse(configData);
-        
-        // Ensure apiProvider is a valid value
-        if (config.apiProvider !== "openai" && config.apiProvider !== "gemini"  && config.apiProvider !== "anthropic") {
-          config.apiProvider = "gemini"; // Default to Gemini if invalid
+        const rawConfig = JSON.parse(configData);
+
+        let provider: "openai" | "gemini" | "anthropic" = rawConfig.apiProvider;
+        if (provider !== "openai" && provider !== "gemini" && provider !== "anthropic") {
+          provider = this.defaultConfig.apiProvider;
         }
-        
-        // Sanitize model selections to ensure only allowed models are used
-        if (config.extractionModel) {
-          config.extractionModel = this.sanitizeModelSelection(config.extractionModel, config.apiProvider);
-        }
-        if (config.solutionModel) {
-          config.solutionModel = this.sanitizeModelSelection(config.solutionModel, config.apiProvider);
-        }
-        if (config.debuggingModel) {
-          config.debuggingModel = this.sanitizeModelSelection(config.debuggingModel, config.apiProvider);
-        }
-        
-        return {
-          ...this.defaultConfig,
-          ...config
+
+        const pickLegacyModel = (): string | undefined => {
+          const candidates = [
+            rawConfig.extractionModel,
+            rawConfig.solutionModel,
+            rawConfig.debuggingModel
+          ];
+
+          for (const candidate of candidates) {
+            if (typeof candidate === "string" && candidate.trim().length > 0) {
+              return candidate.trim();
+            }
+          }
+          return undefined;
         };
+
+        const legacyModel = pickLegacyModel();
+
+        let openaiModel = ensureValue(
+          rawConfig.openaiModel,
+          this.defaultConfig.openaiModel
+        );
+        let geminiModel = ensureValue(
+          rawConfig.geminiModel,
+          this.defaultConfig.geminiModel
+        );
+        let anthropicModel = ensureValue(
+          rawConfig.anthropicModel,
+          this.defaultConfig.anthropicModel
+        );
+
+        if (!rawConfig.openaiModel && provider === "openai" && legacyModel) {
+          openaiModel = ensureValue(legacyModel, this.defaultConfig.openaiModel);
+        }
+        if (!rawConfig.geminiModel && provider === "gemini" && legacyModel) {
+          geminiModel = ensureValue(legacyModel, this.defaultConfig.geminiModel);
+        }
+        if (!rawConfig.anthropicModel && provider === "anthropic" && legacyModel) {
+          anthropicModel = ensureValue(legacyModel, this.defaultConfig.anthropicModel);
+        }
+
+        const migratedConfig: Config = {
+          ...this.defaultConfig,
+          ...rawConfig,
+          apiProvider: provider,
+          openaiModel: sanitizeModelForProvider(openaiModel, "openai"),
+          geminiModel: sanitizeModelForProvider(geminiModel, "gemini"),
+          anthropicModel: sanitizeModelForProvider(anthropicModel, "anthropic"),
+          openaiBaseUrl: ensureValue(
+            rawConfig.openaiBaseUrl,
+            this.defaultConfig.openaiBaseUrl
+          ),
+          geminiBaseUrl: ensureValue(
+            rawConfig.geminiBaseUrl,
+            this.defaultConfig.geminiBaseUrl
+          ),
+          anthropicBaseUrl: ensureValue(
+            rawConfig.anthropicBaseUrl,
+            this.defaultConfig.anthropicBaseUrl
+          )
+        };
+
+        return migratedConfig;
       }
-      
-      // If no config exists, create a default one
+
       this.saveConfig(this.defaultConfig);
       return this.defaultConfig;
     } catch (err) {
@@ -151,65 +220,106 @@ export class ConfigHelper extends EventEmitter {
     try {
       const currentConfig = this.loadConfig();
       let provider = updates.apiProvider || currentConfig.apiProvider;
-      
+
+      const normalize = (value: string | undefined, fallback: string): string => {
+        if (value === undefined) {
+          return fallback;
+        }
+        const trimmed = value.trim();
+        return trimmed.length > 0 ? trimmed : fallback;
+      };
+
       // Auto-detect provider based on API key format if a new key is provided
       if (updates.apiKey && !updates.apiProvider) {
-        // If API key starts with "sk-", it's likely an OpenAI key
         const trimmedKey = updates.apiKey.trim();
         if (trimmedKey.startsWith('sk-ant-')) {
           provider = "anthropic";
           console.log("Auto-detected Anthropic API key format");
+          updates.apiProvider = provider;
         } else if (trimmedKey.startsWith('sk-')) {
           provider = "openai";
           console.log("Auto-detected OpenAI API key format");
+          updates.apiProvider = provider;
         } else {
           provider = "gemini";
           console.log("Using Gemini API key format (default)");
+          updates.apiProvider = provider;
         }
-        
-        // Update the provider in the updates object
-        updates.apiProvider = provider;
       }
-      
-      // If provider is changing, reset models to the default for that provider
+
+      // Normalize base URLs and model names if provided
+      const normalizedUpdates: Partial<Config> = { ...updates };
+
+      if (updates.openaiModel !== undefined || (updates.apiProvider === "openai" && currentConfig.openaiModel === undefined)) {
+        normalizedUpdates.openaiModel = sanitizeModelForProvider(
+          normalize(updates.openaiModel, DEFAULT_MODELS.openai),
+          "openai"
+        );
+      }
+      if (updates.geminiModel !== undefined || (updates.apiProvider === "gemini" && currentConfig.geminiModel === undefined)) {
+        normalizedUpdates.geminiModel = sanitizeModelForProvider(
+          normalize(updates.geminiModel, DEFAULT_MODELS.gemini),
+          "gemini"
+        );
+      }
+      if (updates.anthropicModel !== undefined || (updates.apiProvider === "anthropic" && currentConfig.anthropicModel === undefined)) {
+        normalizedUpdates.anthropicModel = sanitizeModelForProvider(
+          normalize(updates.anthropicModel, DEFAULT_MODELS.anthropic),
+          "anthropic"
+        );
+      }
+
+      if (updates.openaiBaseUrl !== undefined || (updates.apiProvider === "openai" && currentConfig.openaiBaseUrl === undefined)) {
+        normalizedUpdates.openaiBaseUrl = normalize(updates.openaiBaseUrl, DEFAULT_BASE_URLS.openai);
+      }
+      if (updates.geminiBaseUrl !== undefined || (updates.apiProvider === "gemini" && currentConfig.geminiBaseUrl === undefined)) {
+        normalizedUpdates.geminiBaseUrl = normalize(updates.geminiBaseUrl, DEFAULT_BASE_URLS.gemini);
+      }
+      if (updates.anthropicBaseUrl !== undefined || (updates.apiProvider === "anthropic" && currentConfig.anthropicBaseUrl === undefined)) {
+        normalizedUpdates.anthropicBaseUrl = normalize(updates.anthropicBaseUrl, DEFAULT_BASE_URLS.anthropic);
+      }
+
+      // If provider is changing, ensure defaults are present when no overrides supplied
       if (updates.apiProvider && updates.apiProvider !== currentConfig.apiProvider) {
         if (updates.apiProvider === "openai") {
-          updates.extractionModel = "gpt-4o";
-          updates.solutionModel = "gpt-4o";
-          updates.debuggingModel = "gpt-4o";
+          normalizedUpdates.openaiModel = sanitizeModelForProvider(
+            normalize(updates.openaiModel, DEFAULT_MODELS.openai),
+            "openai"
+          );
+          normalizedUpdates.openaiBaseUrl = normalize(updates.openaiBaseUrl, DEFAULT_BASE_URLS.openai);
+        } else if (updates.apiProvider === "gemini") {
+          normalizedUpdates.geminiModel = sanitizeModelForProvider(
+            normalize(updates.geminiModel, DEFAULT_MODELS.gemini),
+            "gemini"
+          );
+          normalizedUpdates.geminiBaseUrl = normalize(updates.geminiBaseUrl, DEFAULT_BASE_URLS.gemini);
         } else if (updates.apiProvider === "anthropic") {
-          updates.extractionModel = "claude-3-7-sonnet-20250219";
-          updates.solutionModel = "claude-3-7-sonnet-20250219";
-          updates.debuggingModel = "claude-3-7-sonnet-20250219";
-        } else {
-          updates.extractionModel = "gemini-2.5-flash";
-          updates.solutionModel = "gemini-2.5-pro";
-          updates.debuggingModel = "gemini-2.5-flash";
+          normalizedUpdates.anthropicModel = sanitizeModelForProvider(
+            normalize(updates.anthropicModel, DEFAULT_MODELS.anthropic),
+            "anthropic"
+          );
+          normalizedUpdates.anthropicBaseUrl = normalize(updates.anthropicBaseUrl, DEFAULT_BASE_URLS.anthropic);
         }
       }
-      
-      // Sanitize model selections in the updates
-      if (updates.extractionModel) {
-        updates.extractionModel = this.sanitizeModelSelection(updates.extractionModel, provider);
-      }
-      if (updates.solutionModel) {
-        updates.solutionModel = this.sanitizeModelSelection(updates.solutionModel, provider);
-      }
-      if (updates.debuggingModel) {
-        updates.debuggingModel = this.sanitizeModelSelection(updates.debuggingModel, provider);
-      }
-      
-      const newConfig = { ...currentConfig, ...updates };
+
+      const newConfig = { ...currentConfig, ...normalizedUpdates };
       this.saveConfig(newConfig);
-      
-      // Only emit update event for changes other than opacity
-      // This prevents re-initializing the AI client when only opacity changes
-      if (updates.apiKey !== undefined || updates.apiProvider !== undefined || 
-          updates.extractionModel !== undefined || updates.solutionModel !== undefined || 
-          updates.debuggingModel !== undefined || updates.language !== undefined) {
+
+      const shouldEmit =
+        updates.apiKey !== undefined ||
+        updates.apiProvider !== undefined ||
+        updates.openaiModel !== undefined ||
+        updates.geminiModel !== undefined ||
+        updates.anthropicModel !== undefined ||
+        updates.openaiBaseUrl !== undefined ||
+        updates.geminiBaseUrl !== undefined ||
+        updates.anthropicBaseUrl !== undefined ||
+        updates.language !== undefined;
+
+      if (shouldEmit) {
         this.emit('config-updated', newConfig);
       }
-      
+
       return newConfig;
     } catch (error) {
       console.error('Error updating config:', error);
@@ -324,7 +434,12 @@ export class ConfigHelper extends EventEmitter {
    */
   private async testOpenAIKey(apiKey: string): Promise<{valid: boolean, error?: string}> {
     try {
-      const openai = new OpenAI({ apiKey });
+      const config = this.loadConfig();
+      const openai = new OpenAI({
+        apiKey,
+        baseURL: config.openaiBaseUrl || DEFAULT_BASE_URLS.openai,
+        timeout: 15000
+      });
       // Make a simple API call to test the key
       await openai.models.list();
       return { valid: true };

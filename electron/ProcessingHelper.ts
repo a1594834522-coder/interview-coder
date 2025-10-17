@@ -48,45 +48,8 @@ export class ProcessingHelper {
   private screenshotHelper: ScreenshotHelper
   private openaiClient: OpenAI | null = null
   private geminiApiKey: string | null = null
+  private geminiBaseUrl: string | null = null
   private anthropicClient: Anthropic | null = null
-
-  private extractJsonObject(raw: string): any | null {
-    if (!raw) {
-      return null;
-    }
-    const sanitized = raw.replace(/```json|```/g, '').trim();
-    const candidates: string[] = [];
-    if (sanitized.startsWith('{') || sanitized.startsWith('[')) {
-      candidates.push(sanitized);
-    }
-
-    const firstBrace = sanitized.indexOf('{');
-    if (firstBrace !== -1) {
-      for (let end = sanitized.length - 1; end > firstBrace; end--) {
-        if (sanitized[end] === '}') {
-          candidates.push(sanitized.slice(firstBrace, end + 1));
-        }
-      }
-    }
-
-    const firstBracket = sanitized.indexOf('[');
-    if (firstBracket !== -1) {
-      for (let end = sanitized.length - 1; end > firstBracket; end--) {
-        if (sanitized[end] === ']') {
-          candidates.push(sanitized.slice(firstBracket, end + 1));
-        }
-      }
-    }
-
-    for (const candidate of candidates) {
-      try {
-        return JSON.parse(candidate);
-      } catch (err) {
-        continue;
-      }
-    }
-    return null;
-  }
 
   // AbortControllers for API requests
   private currentProcessingAbortController: AbortController | null = null
@@ -116,15 +79,18 @@ export class ProcessingHelper {
         if (config.apiKey) {
           this.openaiClient = new OpenAI({ 
             apiKey: config.apiKey,
+            baseURL: config.openaiBaseUrl,
             timeout: 60000, // 60 second timeout
             maxRetries: 2   // Retry up to 2 times
           });
           this.geminiApiKey = null;
+          this.geminiBaseUrl = null;
           this.anthropicClient = null;
           console.log("OpenAI client initialized successfully");
         } else {
           this.openaiClient = null;
           this.geminiApiKey = null;
+          this.geminiBaseUrl = null;
           this.anthropicClient = null;
           console.warn("No API key available, OpenAI client not initialized");
         }
@@ -134,10 +100,12 @@ export class ProcessingHelper {
         this.anthropicClient = null;
         if (config.apiKey) {
           this.geminiApiKey = config.apiKey;
+          this.geminiBaseUrl = config.geminiBaseUrl;
           console.log("Gemini API key set successfully");
         } else {
           this.openaiClient = null;
           this.geminiApiKey = null;
+          this.geminiBaseUrl = null;
           this.anthropicClient = null;
           console.warn("No API key available, Gemini client not initialized");
         }
@@ -145,9 +113,11 @@ export class ProcessingHelper {
         // Reset other clients
         this.openaiClient = null;
         this.geminiApiKey = null;
+        this.geminiBaseUrl = null;
         if (config.apiKey) {
           this.anthropicClient = new Anthropic({
             apiKey: config.apiKey,
+            baseURL: config.anthropicBaseUrl,
             timeout: 60000,
             maxRetries: 2
           });
@@ -155,6 +125,7 @@ export class ProcessingHelper {
         } else {
           this.openaiClient = null;
           this.geminiApiKey = null;
+          this.geminiBaseUrl = null;
           this.anthropicClient = null;
           console.warn("No API key available, Anthropic client not initialized");
         }
@@ -165,6 +136,87 @@ export class ProcessingHelper {
       this.geminiApiKey = null;
       this.anthropicClient = null;
     }
+  }
+
+  private formatDirectResponse(fullText: string, language: string) {
+    const trimmed = (fullText || "").trim();
+    if (!trimmed) {
+      throw new Error("模型未返回内容，请重试或检查截图质量。");
+    }
+
+    const reasoningSteps = ["模型基于截图完成分析"];
+    const codeBlockMatch = trimmed.match(/```([a-zA-Z0-9+#-_]*)\n([\s\S]*?)```/);
+
+    if (codeBlockMatch) {
+      const codeLang = codeBlockMatch[1] || language;
+      const code = codeBlockMatch[2].trim();
+
+      const formattedResponse = {
+        answer_type: "code" as const,
+        content: code,
+        code,
+        thoughts: ["依据题意给出可运行实现"],
+        time_complexity: undefined,
+        space_complexity: undefined,
+        key_takeaways: undefined as string[] | undefined
+      };
+
+      const problemInfo = {
+        problem_statement: "题目来自截图内容",
+        constraints: "N/A",
+        example_input: "N/A",
+        example_output: "N/A",
+        answer_expectations: "根据题意给出最优解答",
+        supporting_material: "N/A",
+        evaluation_focus: "答案准确性",
+        language_hint: codeLang,
+        final_answer: "N/A",
+        final_explanation: "模型直接生成了完整代码实现",
+        reasoning_steps: reasoningSteps,
+        raw_response: trimmed
+      };
+
+      return { formattedResponse, problemInfo };
+    }
+
+    let letter: string | undefined;
+    const letterMatch = trimmed.match(/(?:最终答案|答案)[:：]?\s*([ABCDabcd])/);
+    if (letterMatch) {
+      letter = letterMatch[1].toUpperCase();
+    } else {
+      const soloLine = trimmed
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .find((line) => /^[ABCD]$/i.test(line));
+      if (soloLine) {
+        letter = soloLine.toUpperCase();
+      }
+    }
+
+    const formattedResponse = {
+      answer_type: "analysis" as const,
+      content: trimmed,
+      final_answer: letter,
+      thoughts: undefined as string[] | undefined,
+      key_takeaways: letter ? [`正确选项：${letter}`] : undefined
+    };
+
+    const problemInfo = {
+      problem_statement: "题目来自截图内容",
+      constraints: "N/A",
+      example_input: "N/A",
+      example_output: "N/A",
+      answer_expectations: "根据题意给出最优解答",
+      supporting_material: "N/A",
+      evaluation_focus: "答案准确性",
+      language_hint: "N/A",
+      final_answer: letter || "N/A",
+      final_explanation: letter ? "模型已直接给出最终选项" : "模型提供了解题分析",
+      reasoning_steps: reasoningSteps,
+      raw_response: trimmed
+    };
+
+    return { formattedResponse, problemInfo };
   }
 
   private async waitForInitialization(
@@ -480,46 +532,49 @@ export class ProcessingHelper {
     screenshots: Array<{ path: string; data: string }>,
     signal: AbortSignal
   ) {
+    let provider: "openai" | "gemini" | "anthropic" | null = null;
     try {
       const config = configHelper.loadConfig();
+      provider = config.apiProvider;
       const language = await this.getLanguage();
       const mainWindow = this.deps.getMainWindow();
-      
-      // Step 1: Extract problem info using AI Vision API (OpenAI or Gemini)
-      const imageDataList = screenshots.map(screenshot => screenshot.data);
-      const extractionInstruction = `You are an interview task interpreter supporting coding, math, logical reasoning, reading comprehension, and analytical prompts.\nReturn ONLY valid JSON with the following fields:\n{\n  \"problem_statement\": \"...\",\n  \"constraints\": \"...\",\n  \"example_input\": \"...\",\n  \"example_output\": \"...\",\n  \"answer_expectations\": \"...\",\n  \"supporting_material\": \"...\",\n  \"evaluation_focus\": \"...\",\n  \"language_hint\": \"...\"\n}\nRules:\n- Use complete sentences when summarizing textual prompts.\n- Use \"N/A\" if a field is not provided.\n- Set \"language_hint\" to the requested programming language. If the task is not coding or no language is specified, set it to \"N/A\".\n- Do not include markdown code fences or commentary outside of the JSON body.`;
-      const extractionUserPrompt = `Analyze the uploaded screenshots and populate the schema above. The user's preferred coding language is ${language}. Respect any language explicitly requested in the task.`;
 
-      let problemInfo: any | null = null;
+      const imageDataList = screenshots.map((screenshot) => screenshot.data);
+      const instruction = `请阅读我接下来提供的题目截图：
+1) 如果是单选题：只需在第一行输出“最终答案：A/B/C/D”中的一个字母；第二行用不超过20个字解释原因。
+2) 如果是代码题：直接给出完整、可运行、通过常见边界案例的代码。使用题面或常规默认语言；如题面未指定，优先使用 ${language}。请用 Markdown 代码块标注语言，例如 \`\`\`${language}
+...\`\`\`。解释尽量简短。
+3) 如果是代码题则给出可复制的代码，如果是选择题（阅读理解或图形逻辑）则给出具体ABCD选项。
+4) 不要输出JSON，也不要多余前言。`;
 
-      
-      if (config.apiProvider === "openai") {
-        // Verify OpenAI client
+      const providerLabels = {
+        openai: "OpenAI",
+        gemini: "Gemini",
+        anthropic: "Claude"
+      } as const;
+
+      let fullText = "";
+
+      if (provider === "openai") {
         if (!this.openaiClient) {
-          this.initializeAIClient(); // Try to reinitialize
-          
-          if (!this.openaiClient) {
-            return {
-              success: false,
-              error: "OpenAI API key not configured or invalid. Please check your settings."
-            };
-          }
+          this.initializeAIClient();
+        }
+        if (!this.openaiClient) {
+          return {
+            success: false,
+            error: "OpenAI API key not configured or invalid. Please check your settings."
+          };
         }
 
-        // Use OpenAI for processing
         const messages = [
-          {
-            role: "system" as const, 
-            content: extractionInstruction
-          },
           {
             role: "user" as const,
             content: [
               {
-                type: "text" as const, 
-                text: extractionUserPrompt
+                type: "text" as const,
+                text: instruction
               },
-              ...imageDataList.map(data => ({
+              ...imageDataList.map((data) => ({
                 type: "image_url" as const,
                 image_url: { url: `data:image/png;base64,${data}` }
               }))
@@ -527,29 +582,33 @@ export class ProcessingHelper {
           }
         ];
 
-        // Send to OpenAI Vision API
-        const extractionResponse = await this.openaiClient.chat.completions.create({
-          model: config.extractionModel || "gpt-4o",
-          messages: messages,
+        const response = await this.openaiClient.chat.completions.create({
+          model: config.openaiModel,
+          messages,
           max_tokens: 4000,
           temperature: 0.2
         });
 
-        // Parse the response
-        try {
-          const responseText = extractionResponse.choices[0].message.content;
-          // Handle when OpenAI might wrap the JSON in markdown code blocks
-          const jsonText = responseText.replace(/```json|```/g, '').trim();
-          problemInfo = JSON.parse(jsonText);
-        } catch (error) {
-          console.error("Error parsing OpenAI response:", error);
-          return {
-            success: false,
-            error: "Failed to parse problem information. Please try again or use clearer screenshots."
-          };
+        const messageContent = response.choices[0]?.message?.content as any;
+
+        if (typeof messageContent === "string") {
+          fullText = messageContent;
+        } else if (Array.isArray(messageContent)) {
+          fullText = messageContent
+            .map((part: any) => {
+              if (typeof part === "string") {
+                return part;
+              }
+              if (part?.type === "text" && typeof part.text === "string") {
+                return part.text;
+              }
+              return "";
+            })
+            .join("\n");
+        } else {
+          fullText = "";
         }
-      } else if (config.apiProvider === "gemini")  {
-        // Single-call Gemini workflow (Vision + Answer)
+      } else if (provider === "gemini") {
         if (!this.geminiApiKey) {
           return {
             success: false,
@@ -558,18 +617,21 @@ export class ProcessingHelper {
         }
 
         try {
-          const instruction = `请阅读我接下来提供的题目截图：
-1) 如果是单选题：只需在第一行输出“最终答案：A/B/C/D”中的一个字母；第二行用不超过20个字解释原因。
-2) 如果是代码题：直接给出完整、可运行、通过常见边界案例的代码。使用题面或常规默认语言；如题面未指定，优先使用 ${language}。请用 Markdown 代码块标注语言，例如 \`\`\`${language}\n...\`\`\`。解释尽量简短。
-3) 如果是代码题则给出可复制的代码，如果是选择题（阅读理解或图形逻辑）则给出具体ABCD选项。
-4) 不要输出JSON，也不要多余前言。`;
+          const rawBase = this.geminiBaseUrl || config.geminiBaseUrl || "https://generativelanguage.googleapis.com";
+          const geminiBaseUrl = rawBase.endsWith("/") ? rawBase.slice(0, -1) : rawBase;
+          const modelName = config.geminiModel;
 
           const body: any = {
             contents: [
               {
                 role: "user",
                 parts: [
-                  ...imageDataList.map((data) => ({ inlineData: { mimeType: "image/png", data } })),
+                  ...imageDataList.map((data) => ({
+                    inlineData: {
+                      mimeType: "image/png",
+                      data
+                    }
+                  })),
                   { text: instruction }
                 ]
               }
@@ -582,13 +644,12 @@ export class ProcessingHelper {
           };
 
           const response = await axios.default.post(
-            `https://api.abruzz1.cn/gemini/v1/models/${config.extractionModel || "gemini-2.5-flash"}:generateContent?key=${this.geminiApiKey}`,
+            `${geminiBaseUrl}/models/${modelName}:generateContent?key=${this.geminiApiKey}`,
             body,
             { signal }
           );
 
           const candidates = (response.data?.candidates || []) as any[];
-          console.log("Gemini API response:", JSON.stringify(response.data, null, 2));
 
           if (!candidates.length) {
             const block = response.data?.promptFeedback?.blockReason || "no-candidates";
@@ -596,119 +657,28 @@ export class ProcessingHelper {
           }
 
           const firstCandidate = candidates[0];
+          const parts = firstCandidate?.content?.parts || [];
+          const collectedText: string[] = [];
 
-          // 处理MAX_TOKENS或其他finishReason的情况
-          if (firstCandidate.finishReason === 'MAX_TOKENS') {
-            console.warn("Gemini response truncated due to MAX_TOKENS limit");
-          }
-
-          const content = firstCandidate?.content;
-          const parts = content?.parts || [];
-
-          if (!parts || parts.length === 0) {
-            console.error("Gemini response structure:", response.data);
-            throw new Error("Gemini response: content.parts is empty or missing");
-          }
-
-          const partsText: string[] = [];
-          for (const p of parts) {
-            if (typeof p?.text === 'string') {
-              const text = p.text.trim();
-              if (text || firstCandidate.finishReason === 'MAX_TOKENS') {
-                partsText.push(text);
-              }
+          for (const part of parts) {
+            if (typeof part?.text === "string" && part.text.trim()) {
+              collectedText.push(part.text.trim());
             }
           }
 
-          const fullText = partsText.join('\n').trim();
-          console.log("Extracted Gemini text length:", fullText.length);
+          fullText = collectedText.join("\n").trim();
 
-          if (!fullText && firstCandidate.finishReason !== 'MAX_TOKENS') {
-            console.error("Gemini response missing text, finishReason:", firstCandidate.finishReason);
+          if (!fullText && firstCandidate.finishReason !== "MAX_TOKENS") {
             throw new Error("Gemini response missing text");
           }
-
-          // 判断是否为代码题（含代码块）
-          const codeBlockMatch = fullText.match(/```([a-zA-Z0-9+#-_]*)\n([\s\S]*?)```/);
-          let formattedResponse: any;
-          if (codeBlockMatch) {
-            const codeLang = codeBlockMatch[1] || language;
-            const code = codeBlockMatch[2].trim();
-            formattedResponse = {
-              answer_type: "code" as const,
-              content: code,
-              code,
-              thoughts: ["依据题意给出可运行实现"],
-              time_complexity: undefined,
-              space_complexity: undefined
-            };
-          } else {
-            // 选择题：提取答案字母
-            let letter = null as string | null;
-            const m1 = fullText.match(/(?:最终答案|答案)[:：]?\s*([ABCD])/i);
-            if (m1) letter = m1[1].toUpperCase();
-            if (!letter) {
-              const lines = fullText.split(/\r?\n/).map(s => s.trim());
-              const solo = lines.find(l => /^[ABCD]$/.test(l));
-              if (solo) letter = solo;
-            }
-            formattedResponse = {
-              answer_type: "analysis" as const,
-              content: fullText,
-              final_answer: letter || undefined,
-              thoughts: undefined,
-              key_takeaways: letter ? [`正确选项：${letter}`] : undefined
-            };
-          }
-
-          let reasoningSteps: string[] = ["根据题意提供解决方案"];
-
-          problemInfo = {
-            problem_statement: "题目来自截图内容",
-            constraints: "N/A",
-            example_input: "N/A",
-            example_output: "N/A",
-            answer_expectations: "根据题意给出最优解答",
-            supporting_material: "N/A",
-            evaluation_focus: "答案准确性",
-            language_hint: "N/A",
-            final_answer: formattedResponse.final_answer || "N/A",
-            final_explanation: "已通过模型分析处理",
-            reasoning_steps: reasoningSteps
-          };
-
-          this.deps.setProblemInfo(problemInfo);
-
-          if (mainWindow) {
-            mainWindow.webContents.send(
-              this.deps.PROCESSING_EVENTS.PROBLEM_EXTRACTED,
-              problemInfo
-            );
-            mainWindow.webContents.send("processing-status", {
-              message: "Gemini 2.5 Flash 已完成分析并生成答案",
-              progress: 100
-            });
-          }
-
-          this.screenshotHelper.clearExtraScreenshotQueue();
-
-          return { success: true, data: formattedResponse };
-        } catch (error: any) {
-          const detail = error?.response?.data?.error?.message || error?.message;
-          console.error("Error using Gemini API:", detail || error);
-          const message = detail || "Failed to process with Gemini API. Please check your API key or try again later.";
-          if (mainWindow) {
-            mainWindow.webContents.send(
-              this.deps.PROCESSING_EVENTS.INITIAL_SOLUTION_ERROR,
-              message
-            );
-          }
-          return {
-            success: false,
-            error: message
-          };
+        } catch (error) {
+          console.error("Error using Gemini API:", error);
+          throw error;
         }
-      } else if (config.apiProvider === "anthropic") {
+      } else if (provider === "anthropic") {
+        if (!this.anthropicClient) {
+          this.initializeAIClient();
+        }
         if (!this.anthropicClient) {
           return {
             success: false,
@@ -716,604 +686,123 @@ export class ProcessingHelper {
           };
         }
 
-        try {
-          const messages = [
-            {
-              role: "user" as const,
-              content: [
-                {
-                  type: "text" as const,
-                  text: extractionInstruction
-                },
-                {
-                  type: "text" as const,
-                  text: extractionUserPrompt
-                },
-                ...imageDataList.map(data => ({
-                  type: "image" as const,
-                  source: {
-                    type: "base64" as const,
-                    media_type: "image/png" as const,
-                    data: data
-                  }
-                }))
-              ]
-            }
-          ];
-
-          const response = await this.anthropicClient.messages.create({
-            model: config.extractionModel || "claude-3-7-sonnet-20250219",
-            max_tokens: 4000,
-            messages: messages,
-            temperature: 0.2
-          });
-
-          const responseText = (response.content[0] as { type: 'text', text: string }).text;
-          const jsonText = responseText.replace(/```json|```/g, '').trim();
-          problemInfo = JSON.parse(jsonText);
-        } catch (error: any) {
-          console.error("Error using Anthropic API:", error);
-
-          // Add specific handling for Claude's limitations
-          if (error.status === 429) {
-            return {
-              success: false,
-              error: "Claude API rate limit exceeded. Please wait a few minutes before trying again."
-            };
-          } else if (error.status === 413 || (error.message && error.message.includes("token"))) {
-            return {
-              success: false,
-              error: "Your screenshots contain too much information for Claude to process. Switch to OpenAI or Gemini in settings which can handle larger inputs."
-            };
+        const messages = [
+          {
+            role: "user" as const,
+            content: [
+              {
+                type: "text" as const,
+                text: instruction
+              },
+              ...imageDataList.map((data) => ({
+                type: "image" as const,
+                source: {
+                  type: "base64" as const,
+                  media_type: "image/png" as const,
+                  data
+                }
+              }))
+            ]
           }
+        ];
 
-          return {
-            success: false,
-            error: "Failed to process with Anthropic API. Please check your API key or try again later."
-          };
-        }
-      }
-
-      // Update the user on progress
-      if (mainWindow) {
-        mainWindow.webContents.send("processing-status", {
-          message: "Problem analyzed successfully. Preparing to generate solution...",
-          progress: 40
+        const response = await this.anthropicClient.messages.create({
+          model: config.anthropicModel,
+          max_tokens: 4000,
+          temperature: 0.2,
+          messages
         });
+
+        const textParts: string[] = [];
+        for (const part of response.content as Array<{ type: string; text?: string }>) {
+          if (part.type === "text" && typeof part.text === "string") {
+            textParts.push(part.text.trim());
+          }
+        }
+        fullText = textParts.join("\n").trim();
+      } else {
+        return { success: false, error: "Unsupported provider" };
       }
 
-      // Store problem info in AppState
+      const { formattedResponse, problemInfo } = this.formatDirectResponse(fullText, language);
+
       this.deps.setProblemInfo(problemInfo);
 
-      // Send first success event
+      const label = provider ? providerLabels[provider] : "模型";
+
       if (mainWindow) {
         mainWindow.webContents.send(
           this.deps.PROCESSING_EVENTS.PROBLEM_EXTRACTED,
           problemInfo
         );
-
-        // Generate solutions after successful extraction
-        const solutionsResult = await this.generateSolutionsHelper(signal);
-        if (solutionsResult.success) {
-          // Clear any existing extra screenshots before transitioning to solutions view
-          this.screenshotHelper.clearExtraScreenshotQueue();
-          
-          // Final progress update
-          mainWindow.webContents.send("processing-status", {
-            message: "Solution generated successfully",
-            progress: 100
-          });
-          
-          mainWindow.webContents.send(
-            this.deps.PROCESSING_EVENTS.SOLUTION_SUCCESS,
-            solutionsResult.data
-          );
-          return { success: true, data: solutionsResult.data };
-        } else {
-          throw new Error(
-            solutionsResult.error || "Failed to generate solutions"
-          );
-        }
+        mainWindow.webContents.send("processing-status", {
+          message: `${label} 已完成分析并生成答案`,
+          progress: 100
+        });
       }
 
-      return { success: false, error: "Failed to process screenshots" };
+      this.screenshotHelper.clearExtraScreenshotQueue();
+
+      return { success: true, data: formattedResponse };
     } catch (error: any) {
-      // If the request was cancelled, don't retry
       if (axios.isCancel(error)) {
         return {
           success: false,
           error: "Processing was canceled by the user."
         };
       }
-      
-      // Handle OpenAI API errors specifically
-      if (error?.response?.status === 401) {
-        return {
-          success: false,
-          error: "Invalid OpenAI API key. Please check your settings."
-        };
-      } else if (error?.response?.status === 429) {
-        return {
-          success: false,
-          error: "OpenAI API rate limit exceeded or insufficient credits. Please try again later."
-        };
-      } else if (error?.response?.status === 500) {
-        return {
-          success: false,
-          error: "OpenAI server error. Please try again later."
-        };
+
+      if (provider === "openai") {
+        if (error?.response?.status === 401) {
+          return {
+            success: false,
+            error: "Invalid OpenAI API key. Please check your settings."
+          };
+        }
+        if (error?.response?.status === 429) {
+          return {
+            success: false,
+            error: "OpenAI API rate limit exceeded or insufficient credits. Please try again later."
+          };
+        }
+        if (error?.response?.status === 500) {
+          return {
+            success: false,
+            error: "OpenAI server error. Please try again later."
+          };
+        }
+      }
+
+      if (provider === "gemini") {
+        const detail = error?.response?.data?.error?.message;
+        if (detail) {
+          return { success: false, error: detail };
+        }
+      }
+
+      if (provider === "anthropic") {
+        if (error?.status === 429) {
+          return {
+            success: false,
+            error: "Claude API rate limit exceeded. Please wait a few minutes before trying again."
+          };
+        }
+        if (
+          error?.status === 413 ||
+          (typeof error?.message === "string" && error.message.toLowerCase().includes("token"))
+        ) {
+          return {
+            success: false,
+            error: "Your screenshots contain too much information for Claude to process. Switch to OpenAI or Gemini in settings which can handle larger inputs."
+          };
+        }
       }
 
       console.error("API Error Details:", error);
-      return { 
-        success: false, 
-        error: error.message || "Failed to process screenshots. Please try again." 
+      return {
+        success: false,
+        error: error?.message || "Failed to process screenshots. Please try again."
       };
-    }
-  }
-
-  private async generateSolutionsHelper(signal: AbortSignal) {
-    try {
-      let problemInfo = this.deps.getProblemInfo();
-      const language = await this.getLanguage();
-      const config = configHelper.loadConfig();
-      const mainWindow = this.deps.getMainWindow();
-
-      if (!problemInfo) {
-        throw new Error("No problem info available");
-      }
-
-      if (config.apiProvider === "gemini" && problemInfo.final_answer) {
-        const finalAnswer = (problemInfo.final_answer as string).toUpperCase();
-        const reasoningSteps: string[] = Array.isArray(problemInfo.reasoning_steps)
-          ? (problemInfo.reasoning_steps as string[])
-          : [];
-        const finalExplanation = problemInfo.final_explanation || "确保依据题干选择最合理的选项";
-
-        const formattedResponse = {
-          answer_type: "analysis" as const,
-          content: `最终答案：${finalAnswer}\n理由：${finalExplanation}`,
-          final_answer: finalAnswer,
-          thoughts: reasoningSteps.length > 0 ? reasoningSteps : ["模型依据截图给出答案"],
-          key_takeaways: [
-            `正确选项：${finalAnswer}`,
-            finalExplanation
-          ]
-        };
-
-        return { success: true, data: formattedResponse };
-      }
-
-      // Update progress status
-      // Create prompt for solution generation
-      const hasValue = (value: unknown): value is string =>
-        typeof value === "string" && value.trim() !== "" && value.trim().toLowerCase() !== "n/a";
-
-      const constraintsText = hasValue(problemInfo.constraints)
-        ? problemInfo.constraints
-        : "No specific constraints provided.";
-      const exampleInputText = hasValue(problemInfo.example_input)
-        ? problemInfo.example_input
-        : "No example input provided.";
-      const exampleOutputText = hasValue(problemInfo.example_output)
-        ? problemInfo.example_output
-        : "No example output provided.";
-
-      const answerExpectations = hasValue(problemInfo.answer_expectations)
-        ? problemInfo.answer_expectations
-        : "Provide the most accurate and complete answer.";
-      const supportingMaterial = hasValue(problemInfo.supporting_material)
-        ? problemInfo.supporting_material
-        : "N/A";
-      const evaluationFocus = hasValue(problemInfo.evaluation_focus)
-        ? problemInfo.evaluation_focus
-        : "Clarity, correctness, and coverage of key points.";
-
-      const supportingMaterialBlock = supportingMaterial !== "N/A"
-        ? `SUPPORTING MATERIAL:
-${supportingMaterial}
-
-`
-        : "";
-
-      const systemPrompt = "You are an interview assistant who always follows task instructions precisely and delivers concise, high-quality answers.";
-
-      const userPrompt = `
-请使用简体中文完成回答，并严格遵守以下原则：
-- 如果是代码题则给出可复制的代码（使用 Markdown 代码块，并标注语言为 ${language}），并在代码后说明 Time complexity 与 Space complexity。
-- 如果是选择题（阅读理解或图形逻辑等），请在开头明确写出“最终答案：A/B/C/D”，并给出简洁理由。
-- 特别提示：如果是代码题则给出可复制的代码，如果是选择题（阅读理解或图形逻辑）则给出具体ABCD选项。
-- 其他题型请给出最优方案或结论，并确保论述清晰。
-
-题目信息：
-${problemInfo.problem_statement}
-
-约束条件：
-${constraintsText}
-
-示例输入：
-${exampleInputText}
-
-示例输出：
-${exampleOutputText}
-
-作答期望：
-${answerExpectations}
-
-${supportingMaterialBlock}评估重点：
-${evaluationFocus}
-
-请按照以下结构输出（保留英文标题，内容使用简体中文）：
-
-### Final Answer
-- 直接给出最终答案或代码，如为选择题请以“最终答案：A/B/C/D”开头。
-
-### Reasoning Steps
-- 列出编号步骤，解释推导过程或代码思路。
-
-### Key Takeaways
-- 给出 3 个要点，帮助快速回顾关键信息。
-`;
-
-      if (mainWindow) {
-        mainWindow.webContents.send("processing-status", {
-          message: "Formulating answer based on screenshots...",
-          progress: 60
-        });
-      }
-
-      let responseContent;
-
-      
-      if (config.apiProvider === "openai") {
-        // OpenAI processing
-        if (!this.openaiClient) {
-          return {
-            success: false,
-            error: "OpenAI API key not configured. Please check your settings."
-          };
-        }
-        
-        // Send to OpenAI API
-        const solutionResponse = await this.openaiClient.chat.completions.create({
-          model: config.solutionModel || "gpt-4o",
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt }
-          ],
-          max_tokens: 4000,
-          temperature: 0.2
-        });
-
-        responseContent = solutionResponse.choices[0].message.content;
-      } else if (config.apiProvider === "anthropic") {
-        // Anthropic processing
-        if (!this.anthropicClient) {
-          return {
-            success: false,
-            error: "Anthropic API key not configured. Please check your settings."
-          };
-        }
-        
-        try {
-          const messages = [
-            {
-              role: "user" as const,
-              content: [
-                {
-                  type: "text" as const,
-                  text: `${systemPrompt}
-
-${userPrompt}`
-                }
-              ]
-            }
-          ];
-
-          // Send to Anthropic API
-          const response = await this.anthropicClient.messages.create({
-            model: config.solutionModel || "claude-3-7-sonnet-20250219",
-            max_tokens: 4000,
-            messages: messages,
-            temperature: 0.2
-          });
-
-          responseContent = (response.content[0] as { type: 'text', text: string }).text;
-        } catch (error: any) {
-          console.error("Error using Anthropic API for solution:", error);
-
-          // Add specific handling for Claude's limitations
-          if (error.status === 429) {
-            return {
-              success: false,
-              error: "Claude API rate limit exceeded. Please wait a few minutes before trying again."
-            };
-          } else if (error.status === 413 || (error.message && error.message.includes("token"))) {
-            return {
-              success: false,
-              error: "Your screenshots contain too much information for Claude to process. Switch to OpenAI or Gemini in settings which can handle larger inputs."
-            };
-          }
-
-          return {
-            success: false,
-            error: "Failed to generate solution with Anthropic API. Please check your API key or try again later."
-          };
-        }
-      }
-      
-      if (problemInfo) {
-
-        const defaultProblemInfo = {
-
-          constraints: 'N/A',
-
-          example_input: 'N/A',
-
-          example_output: 'N/A',
-
-          answer_expectations: 'N/A',
-
-          supporting_material: 'N/A',
-
-          evaluation_focus: 'N/A',
-
-          language_hint: 'N/A'
-
-        };
-
-
-
-        const normalizedProblemInfo = {
-
-          ...defaultProblemInfo,
-
-          ...(problemInfo ?? {})
-
-        };
-
-
-
-        if (typeof normalizedProblemInfo.language_hint !== 'string' || normalizedProblemInfo.language_hint.trim() === '') {
-
-          normalizedProblemInfo.language_hint = language;
-
-        }
-
-
-
-        if (!normalizedProblemInfo.answer_expectations || normalizedProblemInfo.answer_expectations.trim() === '' || normalizedProblemInfo.answer_expectations.trim().toLowerCase() === 'n/a') {
-
-          normalizedProblemInfo.answer_expectations = 'Provide the most accurate and complete answer.';
-
-        }
-
-
-
-        problemInfo = normalizedProblemInfo;
-
-      }
-
-
-
-      if (mainWindow) {
-
-        mainWindow.webContents.send('processing-status', {
-
-          message: 'Analyzing problem from screenshots...',
-
-          progress: 20
-
-        });
-
-      }
-
-
-
-      // Extract parts from the response
-
-      if (!responseContent) {
-        throw new Error("No content returned from the model");
-      }
-
-      const normalizedContent = responseContent.replace(/\r\n/g, '\n');
-      const codeMatch = normalizedContent.match(/```(?:\w+)?\s*([\s\S]*?)```/);
-
-      if (!codeMatch) {
-
-        const finalAnswerSection = normalizedContent.match(/###\s*Final Answer\s*([\s\S]*?)(?=###|$)/i);
-
-        const reasoningSection = normalizedContent.match(/###\s*Reasoning Steps\s*([\s\S]*?)(?=###|$)/i);
-
-        const takeawaysSection = normalizedContent.match(/###\s*Key Takeaways\s*([\s\S]*?)(?=###|$)/i);
-
-
-
-        const toList = (section: RegExpMatchArray | null): string[] => {
-
-          if (!section || !section[1]) {
-
-            return [];
-
-          }
-
-
-
-          const candidateLines = section[1]
-
-            .split('\n')
-
-            .map((line) => line.trim())
-
-            .filter(Boolean);
-
-
-
-          const bulletLines = candidateLines
-
-            .filter((line) => /^([-*?]|\d+\.)\s+/.test(line))
-
-            .map((line) => line.replace(/^([-*?]|\d+\.)\s+/, ''));
-
-
-
-          return bulletLines.length > 0 ? bulletLines : candidateLines;
-
-        };
-
-
-
-        const reasoningSteps = toList(reasoningSection);
-
-        const keyTakeaways = toList(takeawaysSection);
-
-        const finalAnswer = finalAnswerSection && finalAnswerSection[1]
-
-          ? finalAnswerSection[1].trim()
-
-          : normalizedContent.trim();
-
-
-
-        const analysisResponse = {
-
-          answer_type: 'analysis' as const,
-
-          content: finalAnswer,
-
-          code: finalAnswer,
-
-          thoughts: reasoningSteps.length > 0
-
-            ? reasoningSteps
-
-            : ['Reasoning steps derived from the model response.'],
-
-          time_complexity: 'N/A - Not a coding task',
-
-          space_complexity: 'N/A - Not a coding task',
-
-          key_takeaways: (keyTakeaways.length > 0 ? keyTakeaways : undefined) as string[] | undefined
-
-        };
-
-
-
-        return { success: true, data: analysisResponse };
-
-      }
-
-
-
-      const code = codeMatch ? codeMatch[1].trim() : normalizedContent;
-
-
-
-      // Extract thoughts, looking for bullet points or numbered lists
-
-      const thoughtsRegex = /(?:Thoughts:|Key Insights:|Reasoning:|Approach:)([\s\S]*?)(?:Time complexity:|$)/i;
-
-      const thoughtsMatch = normalizedContent.match(thoughtsRegex);
-
-      let thoughts: string[] = [];
-
-
-
-      if (thoughtsMatch && thoughtsMatch[1]) {
-
-        const candidateLines = thoughtsMatch[1]
-
-          .split('\n')
-
-          .map((line) => line.trim())
-
-          .filter(Boolean);
-
-
-
-        const bulletLines = candidateLines
-
-          .filter((line) => /^([-*?]|\d+\.)\s+/.test(line))
-
-          .map((line) => line.replace(/^([-*?]|\d+\.)\s+/, ''));
-
-
-
-        thoughts = bulletLines.length > 0 ? bulletLines : candidateLines;
-
-      }
-
-      const timeComplexityPattern = /Time complexity:?\s*([^\n]+(?:\n[^\n]+)*?)(?=\n\s*(?:Space complexity|$))/i;
-
-      const spaceComplexityPattern = /Space complexity:?\s*([^\n]+(?:\n[^\n]+)*?)(?=\n\s*(?:[A-Z]|$))/i;
-
-      let timeComplexity = "O(n) - Linear time complexity because we only iterate through the array once. Each element is processed exactly one time, and the hashmap lookups are O(1) operations.";
-      let spaceComplexity = "O(n) - Linear space complexity because we store elements in the hashmap. In the worst case, we might need to store all elements before finding the solution pair.";
-
-      const timeMatch = normalizedContent.match(timeComplexityPattern);
-      if (timeMatch && timeMatch[1]) {
-        timeComplexity = timeMatch[1].trim();
-        if (!timeComplexity.match(/O\([^)]+\)/i)) {
-          timeComplexity = `O(n) - ${timeComplexity}`;
-        } else if (!timeComplexity.includes('-') && !timeComplexity.includes('because')) {
-          const notationMatch = timeComplexity.match(/O\([^)]+\)/i);
-          if (notationMatch) {
-            const notation = notationMatch[0];
-            const rest = timeComplexity.replace(notation, '').trim();
-            timeComplexity = `${notation} - ${rest}`;
-          }
-        }
-      }
-
-      const spaceMatch = normalizedContent.match(spaceComplexityPattern);
-      if (spaceMatch && spaceMatch[1]) {
-        spaceComplexity = spaceMatch[1].trim();
-        if (!spaceComplexity.match(/O\([^)]+\)/i)) {
-          spaceComplexity = `O(n) - ${spaceComplexity}`;
-        } else if (!spaceComplexity.includes('-') && !spaceComplexity.includes('because')) {
-          const notationMatch = spaceComplexity.match(/O\([^)]+\)/i);
-          if (notationMatch) {
-            const notation = notationMatch[0];
-            const rest = spaceComplexity.replace(notation, '').trim();
-            spaceComplexity = `${notation} - ${rest}`;
-          }
-        }
-      }
-
-      const formattedResponse = {
-        answer_type: "code" as const,
-        content: code,
-        code: code,
-        thoughts: thoughts.length > 0 ? thoughts : ["Solution approach based on efficiency and readability"],
-        time_complexity: timeComplexity,
-        space_complexity: spaceComplexity,
-        key_takeaways: undefined as string[] | undefined
-      };
-
-      return { success: true, data: formattedResponse };
-
-    } catch (error: any) {
-      if (axios.isCancel(error)) {
-        return {
-          success: false,
-          error: "Processing was canceled by the user."
-        };
-      }
-      
-      if (error?.response?.status === 401) {
-        return {
-          success: false,
-          error: "Invalid OpenAI API key. Please check your settings."
-        };
-      } else if (error?.response?.status === 429) {
-        return {
-          success: false,
-          error: "OpenAI API rate limit exceeded or insufficient credits. Please try again later."
-        };
-      }
-      
-      console.error("Solution generation error:", error);
-      return { success: false, error: error.message || "Failed to generate solution" };
     }
   }
 
@@ -1402,7 +891,7 @@ If you include code examples, use proper markdown code blocks with language spec
         }
 
         const debugResponse = await this.openaiClient.chat.completions.create({
-          model: config.debuggingModel || "gpt-4o",
+          model: config.openaiModel,
           messages: messages,
           max_tokens: 4000,
           temperature: 0.2
@@ -1464,8 +953,12 @@ If you include code examples, use proper markdown code blocks with language spec
             });
           }
 
+          const rawBase = this.geminiBaseUrl || config.geminiBaseUrl || "https://generativelanguage.googleapis.com";
+          const geminiBaseUrl = rawBase.endsWith("/") ? rawBase.slice(0, -1) : rawBase;
+          const modelName = config.geminiModel;
+
           const response = await axios.default.post(
-            `https://api.abruzz1.cn/gemini/v1/models/${config.debuggingModel || "gemini-2.5-flash"}:generateContent?key=${this.geminiApiKey}`,
+            `${geminiBaseUrl}/models/${modelName}:generateContent?key=${this.geminiApiKey}`,
             {
               contents: geminiMessages,
               generationConfig: {
@@ -1562,7 +1055,7 @@ If you include code examples, use proper markdown code blocks with language spec
           }
 
           const response = await this.anthropicClient.messages.create({
-            model: config.debuggingModel || "claude-3-7-sonnet-20250219",
+            model: config.anthropicModel,
             max_tokens: 4000,
             messages: messages,
             temperature: 0.2

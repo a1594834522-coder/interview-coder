@@ -21,6 +21,7 @@ const ToastViewport = React.forwardRef<
       "fixed top-0 right-0 z-[100] flex max-h-screen w-full flex-col-reverse gap-1 p-2 sm:top-0 sm:right-0 sm:flex-col md:max-w-[320px]",
       className
     )}
+    data-interactive-region
     {...props}
   />
 ))
@@ -64,6 +65,7 @@ const Toast = React.forwardRef<
       toastVariants[variant].bgColor,
       className
     )}
+    data-interactive-region
     {...props}
   >
     {toastVariants[variant].icon}

@@ -2,7 +2,7 @@
 
 import path from "node:path";
 import fs from "node:fs";
-import { app } from "electron";
+import { app, nativeImage } from "electron";
 import { v4 as uuidv4 } from "uuid";
 import { execFile } from "child_process";
 import { promisify } from "util";
@@ -351,6 +351,8 @@ export class ScreenshotHelper {
         throw new Error("Screenshot capture returned empty buffer");
       }
 
+      const optimizedBuffer = this.optimizeScreenshotBuffer(screenshotBuffer);
+
       // Save and manage the screenshot based on current view
       if (this.view === "queue") {
         screenshotPath = path.join(this.screenshotDir, `${uuidv4()}.png`);
@@ -358,7 +360,7 @@ export class ScreenshotHelper {
         if (!fs.existsSync(screenshotDir)) {
           fs.mkdirSync(screenshotDir, { recursive: true });
         }
-        await fs.promises.writeFile(screenshotPath, screenshotBuffer);
+        await fs.promises.writeFile(screenshotPath, optimizedBuffer);
         console.log("Adding screenshot to main queue:", screenshotPath);
         this.screenshotQueue.push(screenshotPath);
         if (this.screenshotQueue.length > this.MAX_SCREENSHOTS) {
@@ -382,7 +384,7 @@ export class ScreenshotHelper {
         if (!fs.existsSync(screenshotDir)) {
           fs.mkdirSync(screenshotDir, { recursive: true });
         }
-        await fs.promises.writeFile(screenshotPath, screenshotBuffer);
+        await fs.promises.writeFile(screenshotPath, optimizedBuffer);
         console.log("Adding screenshot to extra queue:", screenshotPath);
         this.extraScreenshotQueue.push(screenshotPath);
         if (this.extraScreenshotQueue.length > this.MAX_SCREENSHOTS) {
@@ -410,6 +412,44 @@ export class ScreenshotHelper {
     }
 
     return screenshotPath;
+  }
+
+  private optimizeScreenshotBuffer(buffer: Buffer): Buffer {
+    try {
+      const image = nativeImage.createFromBuffer(buffer);
+      if (image.isEmpty()) {
+        return buffer;
+      }
+
+      const { width, height } = image.getSize();
+      if (width === 0 || height === 0) {
+        return buffer;
+      }
+
+      const MAX_DIMENSION = 1600;
+      const largestDimension = Math.max(width, height);
+
+      if (largestDimension <= MAX_DIMENSION) {
+        // Already within bounds, but re-encode to ensure a consistent PNG output
+        return image.toPNG();
+      }
+
+      const scale = MAX_DIMENSION / largestDimension;
+      const resized = image.resize({
+        width: Math.max(1, Math.round(width * scale)),
+        height: Math.max(1, Math.round(height * scale)),
+        quality: "best"
+      });
+
+      console.log(
+        `Compressed screenshot from ${width}x${height} to ${resized.getSize().width}x${resized.getSize().height}`
+      );
+
+      return resized.toPNG();
+    } catch (error) {
+      console.warn("Failed to optimize screenshot buffer, using original buffer:", error);
+      return buffer;
+    }
   }
 
   public async getImagePreview(filepath: string): Promise<string> {

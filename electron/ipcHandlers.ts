@@ -318,6 +318,21 @@ export function initializeIpcHandlers(deps: IIpcHandlerDeps): void {
       return { error: "Failed to move window down" }
     }
   })
+
+  ipcMain.handle("set-click-through", (_event, ignore: boolean) => {
+    const win = deps.getMainWindow()
+    if (!win || win.isDestroyed()) {
+      return { success: false, error: "Main window unavailable" }
+    }
+
+    if (ignore) {
+      win.setIgnoreMouseEvents(true, { forward: true })
+    } else {
+      win.setIgnoreMouseEvents(false)
+    }
+
+    return { success: true }
+  })
   
   // Delete last screenshot handler
   ipcMain.handle("delete-last-screenshot", async () => {
